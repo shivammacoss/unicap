@@ -3,6 +3,146 @@ dotenv.config()
 import express from 'express'
 import metaApiService from '../services/metaApiService.js'
 
+// Binance symbol mapping for fallback pricing
+const BINANCE_MAP = {
+  'BTCUSD': 'BTCUSDT', 'ETHUSD': 'ETHUSDT', 'BNBUSD': 'BNBUSDT', 'SOLUSD': 'SOLUSDT',
+  'XRPUSD': 'XRPUSDT', 'ADAUSD': 'ADAUSDT', 'DOGEUSD': 'DOGEUSDT', 'DOTUSD': 'DOTUSDT',
+  'MATICUSD': 'MATICUSDT', 'LTCUSD': 'LTCUSDT', 'SHIBUSD': 'SHIBUSDT', 'AVAXUSD': 'AVAXUSDT',
+  'LINKUSD': 'LINKUSDT', 'UNIUSD': 'UNIUSDT', 'ATOMUSD': 'ATOMUSDT', 'XLMUSD': 'XLMUSDT',
+  'NEARUSD': 'NEARUSDT', 'FTMUSD': 'FTMUSDT', 'ALGOUSD': 'ALGOUSDT', 'VETUSD': 'VETUSDT',
+  'ICPUSD': 'ICPUSDT', 'FILUSD': 'FILUSDT', 'TRXUSD': 'TRXUSDT', 'ETCUSD': 'ETCUSDT',
+  'AAVEUSD': 'AAVEUSDT', 'MKRUSD': 'MKRUSDT', 'SANDUSD': 'SANDUSDT', 'MANAUSD': 'MANAUSDT',
+  'AXSUSD': 'AXSUSDT', 'THETAUSD': 'THETAUSDT', 'FLOWUSD': 'FLOWUSDT', 'SNXUSD': 'SNXUSDT',
+  'EOSUSD': 'EOSUSDT', 'CHZUSD': 'CHZUSDT', 'ENJUSD': 'ENJUSDT', 'PEPEUSD': 'PEPEUSDT',
+  'ARBUSD': 'ARBUSDT', 'OPUSD': 'OPUSDT', 'SUIUSD': 'SUIUSDT', 'APTUSD': 'APTUSDT',
+  'INJUSD': 'INJUSDT', 'TONUSD': 'TONUSDT', 'HBARUSD': 'HBARUSDT', 'BCHUSD': 'BCHUSDT',
+  'XMRUSD': 'XMRUSDT', 'NEOUSD': 'NEOUSDT',
+  // Forex pairs on Binance (some available)
+  'EURUSD': null, 'GBPUSD': null, 'USDJPY': null, 'USDCHF': null,
+  // Metals - PAXG as gold proxy
+  'XAUUSD': null, 'XAGUSD': null
+}
+
+// Binance fallback price cache (refreshed periodically)
+let binancePriceCache = new Map()
+let lastBinanceFetch = 0
+const BINANCE_CACHE_TTL = 3000 // 3 seconds
+
+async function fetchBinancePrices() {
+  const now = Date.now()
+  if (now - lastBinanceFetch < BINANCE_CACHE_TTL && binancePriceCache.size > 0) {
+    return binancePriceCache
+  }
+  try {
+    const res = await fetch('https://api.binance.com/api/v3/ticker/bookTicker')
+    if (!res.ok) return binancePriceCache
+    const tickers = await res.json()
+    const tickerMap = new Map(tickers.map(t => [t.symbol, t]))
+    
+    // Map our symbols to Binance tickers
+    for (const [ourSymbol, binSymbol] of Object.entries(BINANCE_MAP)) {
+      if (!binSymbol) continue
+      const ticker = tickerMap.get(binSymbol)
+      if (ticker) {
+        const bid = parseFloat(ticker.bidPrice)
+        const ask = parseFloat(ticker.askPrice)
+        if (bid > 0 && ask > 0) {
+          binancePriceCache.set(ourSymbol, { bid, ask })
+        }
+      }
+    }
+    lastBinanceFetch = now
+  } catch (e) {
+    console.error('[Binance] Fallback price fetch error:', e.message)
+  }
+  return binancePriceCache
+}
+
+// Forex/Metals fallback using multiple free sources
+let forexPriceCache = new Map()
+let lastForexFetch = 0
+const FOREX_CACHE_TTL = 5000 // 5 seconds
+
+const FOREX_PAIRS = {
+  'EURUSD': { base: 'EUR', quote: 'USD' },
+  'GBPUSD': { base: 'GBP', quote: 'USD' },
+  'USDJPY': { base: 'USD', quote: 'JPY' },
+  'USDCHF': { base: 'USD', quote: 'CHF' },
+  'AUDUSD': { base: 'AUD', quote: 'USD' },
+  'NZDUSD': { base: 'NZD', quote: 'USD' },
+  'USDCAD': { base: 'USD', quote: 'CAD' },
+  'EURGBP': { base: 'EUR', quote: 'GBP' },
+  'EURJPY': { base: 'EUR', quote: 'JPY' },
+  'GBPJPY': { base: 'GBP', quote: 'JPY' },
+  'EURCHF': { base: 'EUR', quote: 'CHF' },
+  'EURAUD': { base: 'EUR', quote: 'AUD' },
+  'AUDCAD': { base: 'AUD', quote: 'CAD' },
+  'AUDJPY': { base: 'AUD', quote: 'JPY' },
+  'CADJPY': { base: 'CAD', quote: 'JPY' },
+  'XAUUSD': { base: 'XAU', quote: 'USD' },
+  'XAGUSD': { base: 'XAG', quote: 'USD' },
+}
+
+async function fetchForexPrices() {
+  const now = Date.now()
+  if (now - lastForexFetch < FOREX_CACHE_TTL && forexPriceCache.size > 0) {
+    return forexPriceCache
+  }
+  try {
+    // Try cdn.jsdelivr.net open-source rates (no API key needed)
+    const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json')
+    if (!res.ok) return forexPriceCache
+    const data = await res.json()
+    if (!data.usd) return forexPriceCache
+    
+    const rates = data.usd // rates relative to 1 USD
+    
+    // Currency code mapping (lowercase in API)
+    const codeMap = {
+      'EUR': 'eur', 'GBP': 'gbp', 'JPY': 'jpy', 'CHF': 'chf',
+      'AUD': 'aud', 'NZD': 'nzd', 'CAD': 'cad', 'SGD': 'sgd',
+      'HKD': 'hkd', 'ZAR': 'zar', 'TRY': 'try', 'MXN': 'mxn',
+      'PLN': 'pln', 'SEK': 'sek', 'NOK': 'nok', 'DKK': 'dkk',
+      'CNH': 'cny', 'XAU': 'xau', 'XAG': 'xag'
+    }
+    
+    for (const [symbol, pair] of Object.entries(FOREX_PAIRS)) {
+      let mid = null
+      const baseCode = codeMap[pair.base]
+      const quoteCode = codeMap[pair.quote]
+      
+      if (pair.base === 'USD' && quoteCode && rates[quoteCode]) {
+        // USDXXX = rate directly
+        mid = rates[quoteCode]
+      } else if (pair.quote === 'USD' && baseCode && rates[baseCode]) {
+        // XXXUSD = 1 / rate
+        mid = 1 / rates[baseCode]
+      } else if (baseCode && quoteCode && rates[baseCode] && rates[quoteCode]) {
+        // Cross pair: XXXYYY = (1/baseRate) * quoteRate
+        mid = rates[quoteCode] / rates[baseCode]
+      }
+      
+      if (mid && mid > 0) {
+        // Add realistic spread based on instrument type
+        let spreadPips = 0.00010 // 1 pip for major forex
+        if (symbol.includes('JPY')) spreadPips = 0.010
+        if (symbol.startsWith('XAU')) spreadPips = mid * 0.0003 // ~0.03% for gold
+        if (symbol.startsWith('XAG')) spreadPips = mid * 0.0005 // ~0.05% for silver
+        
+        const halfSpread = spreadPips / 2
+        forexPriceCache.set(symbol, { bid: mid - halfSpread, ask: mid + halfSpread })
+      }
+    }
+    lastForexFetch = now
+    if (forexPriceCache.size > 0) {
+      console.log(`[Forex] Fallback: ${forexPriceCache.size} forex/metals prices loaded`)
+    }
+  } catch (e) {
+    console.error('[Forex] Fallback price fetch error:', e.message)
+  }
+  return forexPriceCache
+}
+
 const router = express.Router()
 
 // Popular instruments per category (shown by default - 15 max)
@@ -39,18 +179,28 @@ function getDefaultInstruments() {
   ]
 }
 
-// GET /api/prices/instruments - Get all available instruments (only those with live prices)
+// GET /api/prices/instruments - Get all available instruments
 router.get('/instruments', async (req, res) => {
   try {
     console.log('[MetaApi] Returning supported instruments')
     
     // Get price cache from MetaApi service
     const priceCache = metaApiService.getPriceCache()
-    
-    // Only show symbols that have actual price data
     const symbolsWithPrices = Array.from(priceCache.keys())
     
-    const instruments = symbolsWithPrices.map(symbol => {
+    // If MetaApi has live data, use those symbols
+    // Otherwise, fall back to ALL known symbols so the UI isn't empty
+    const symbolList = symbolsWithPrices.length > 0
+      ? symbolsWithPrices
+      : [...new Set([
+          ...metaApiService.FOREX_SYMBOLS,
+          ...metaApiService.METAL_SYMBOLS,
+          ...metaApiService.ENERGY_SYMBOLS,
+          ...metaApiService.CRYPTO_SYMBOLS,
+          ...metaApiService.STOCK_SYMBOLS
+        ])]
+    
+    const instruments = symbolList.map(symbol => {
       const category = categorizeSymbol(symbol)
       const isPopular = POPULAR_INSTRUMENTS[category]?.includes(symbol) || false
       return {
@@ -66,7 +216,7 @@ router.get('/instruments', async (req, res) => {
       }
     })
     
-    console.log('[MetaApi] Returning', instruments.length, 'instruments with live prices')
+    console.log('[MetaApi] Returning', instruments.length, 'instruments', symbolsWithPrices.length > 0 ? '(live)' : '(fallback)')
     res.json({ success: true, instruments })
   } catch (error) {
     console.error('[MetaApi] Error fetching instruments:', error)
@@ -144,19 +294,25 @@ function getContractSize(symbol) {
 router.get('/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params
-    const SYMBOL_MAP = metaApiService.SYMBOL_MAP
     
-    // Check if symbol is supported (allow any symbol, will return null if not available)
-    if (!SYMBOL_MAP[symbol] && !symbol) {
-      return res.status(404).json({ success: false, message: `Symbol ${symbol} not supported` })
-    }
-    
-    // Try to get from cache first
+    // 1. Try MetaApi cache
     let price = metaApiService.getPrice(symbol)
     
-    // If not in cache, fetch from terminal state
+    // 2. Try MetaApi terminal state
     if (!price) {
       price = await metaApiService.fetchPriceREST(symbol)
+    }
+    
+    // 3. Fallback to Binance/Forex
+    if (!price) {
+      const binancePrices = await fetchBinancePrices()
+      const bp = binancePrices.get(symbol)
+      if (bp) price = bp
+    }
+    if (!price) {
+      const forexPrices = await fetchForexPrices()
+      const fp = forexPrices.get(symbol)
+      if (fp) price = fp
     }
     
     if (price) {
@@ -165,7 +321,7 @@ router.get('/:symbol', async (req, res) => {
       res.status(404).json({ success: false, message: 'Price not available' })
     }
   } catch (error) {
-    console.error('[MetaApi] Error fetching price:', error)
+    console.error('[Prices] Error fetching price:', error)
     res.status(500).json({ success: false, message: error.message })
   }
 })
@@ -178,14 +334,11 @@ router.post('/batch', async (req, res) => {
       return res.status(400).json({ success: false, message: 'symbols array required' })
     }
     
-    const SYMBOL_MAP = metaApiService.SYMBOL_MAP
     const prices = {}
     const missingSymbols = []
     
-    // Get prices from cache first
+    // 1. Try MetaApi cache first
     for (const symbol of symbols) {
-      // Allow any symbol, not just mapped ones
-      
       const cached = metaApiService.getPrice(symbol)
       if (cached) {
         prices[symbol] = { bid: cached.bid, ask: cached.ask }
@@ -194,17 +347,39 @@ router.post('/batch', async (req, res) => {
       }
     }
     
-    // Fetch missing prices from terminal state
+    // 2. Try MetaApi terminal state for missing
     if (missingSymbols.length > 0) {
       const batchPrices = await metaApiService.fetchBatchPricesREST(missingSymbols)
       for (const [symbol, price] of Object.entries(batchPrices)) {
         prices[symbol] = { bid: price.bid, ask: price.ask }
+        const idx = missingSymbols.indexOf(symbol)
+        if (idx > -1) missingSymbols.splice(idx, 1)
+      }
+    }
+    
+    // 3. Fallback: Binance for crypto, exchangerate for forex/metals
+    if (missingSymbols.length > 0) {
+      const [binancePrices, forexPrices] = await Promise.all([
+        fetchBinancePrices(),
+        fetchForexPrices()
+      ])
+      
+      for (const symbol of missingSymbols) {
+        const bp = binancePrices.get(symbol)
+        if (bp) {
+          prices[symbol] = { bid: bp.bid, ask: bp.ask }
+          continue
+        }
+        const fp = forexPrices.get(symbol)
+        if (fp) {
+          prices[symbol] = { bid: fp.bid, ask: fp.ask }
+        }
       }
     }
     
     res.json({ success: true, prices })
   } catch (error) {
-    console.error('[MetaApi] Error fetching batch prices:', error)
+    console.error('[Prices] Error fetching batch prices:', error)
     res.status(500).json({ success: false, message: error.message })
   }
 })
