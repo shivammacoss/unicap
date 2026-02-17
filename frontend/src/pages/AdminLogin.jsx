@@ -57,6 +57,15 @@ const AdminLogin = () => {
           <X size={16} className="text-gray-400" />
         </button>
 
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <img
+            src="/unicapicon.png"
+            alt="Unicap Logo"
+            className="h-12 w-auto object-contain"
+          />
+        </div>
+
         <div className="flex items-center gap-2 mb-6">
           <div className="px-3 py-1 rounded-full text-sm font-medium bg-red-500/20 text-red-500">
             Super Admin Portal

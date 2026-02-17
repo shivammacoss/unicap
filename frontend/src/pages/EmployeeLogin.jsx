@@ -57,6 +57,15 @@ const EmployeeLogin = () => {
           <X size={16} className="text-gray-400" />
         </button>
 
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <img
+            src="/unicapicon.png"
+            alt="Unicap Logo"
+            className="h-12 w-auto object-contain"
+          />
+        </div>
+
         <div className="flex items-center gap-2 mb-6">
           <div className="px-3 py-1 rounded-full text-sm font-medium bg-blue-500/20 text-blue-500">
             Employee Portal

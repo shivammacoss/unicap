@@ -25,8 +25,8 @@ const Navigation = () => {
         <div className="flex items-center gap-[34px]">
           <a href="/" className="flex items-center">
             <img
-              src="/PipXcapital.png"
-              alt="PipXcapital Logo"
+              src="/unicapicon.png"
+              alt="unicap Logo"
               className="h-[60px] w-auto object-contain"
             />
           </a>
@@ -41,7 +41,7 @@ const Navigation = () => {
         </div>
         <div className="flex items-center gap-[12px] md:gap-[24px]">
           <a
-            href="/PipXcapital.apk"
+            href="/unicap.apk"
             download
             className="flex items-center gap-2 rounded-lg border border-green-500/50 bg-green-500/10 px-4 lg:px-5 py-2 lg:py-2.5 text-[14px] lg:text-[15px] font-semibold text-green-400 backdrop-blur-sm transition-all hover:bg-green-500/20 active:scale-95"
           >

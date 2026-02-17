@@ -314,8 +314,8 @@ const Signup = () => {
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <img
-            src="/PipXcapital.png"
-            alt="PipXcapital Logo"
+            src="/unicapicon.png"
+            alt="unicap Logo"
             className="h-12 w-auto object-contain"
           />
         </div>

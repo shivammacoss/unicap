@@ -445,8 +445,8 @@ router.post('/forgot-password', async (req, res) => {
           email: user.email,
           otp,
           expiryMinutes,
-          platformName: 'PipXcapital',
-          supportEmail: emailSettings?.fromEmail || 'support@PipXcapital.com',
+          platformName: 'unicap',
+          supportEmail: emailSettings?.fromEmail || 'support@unicap.com',
           year: new Date().getFullYear().toString()
         })
 
