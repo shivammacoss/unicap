@@ -64,6 +64,7 @@ let lastForexFetch = 0
 const FOREX_CACHE_TTL = 5000 // 5 seconds
 
 const FOREX_PAIRS = {
+  // Major pairs
   'EURUSD': { base: 'EUR', quote: 'USD' },
   'GBPUSD': { base: 'GBP', quote: 'USD' },
   'USDJPY': { base: 'USD', quote: 'JPY' },
@@ -71,16 +72,56 @@ const FOREX_PAIRS = {
   'AUDUSD': { base: 'AUD', quote: 'USD' },
   'NZDUSD': { base: 'NZD', quote: 'USD' },
   'USDCAD': { base: 'USD', quote: 'CAD' },
+  // Cross pairs
   'EURGBP': { base: 'EUR', quote: 'GBP' },
   'EURJPY': { base: 'EUR', quote: 'JPY' },
   'GBPJPY': { base: 'GBP', quote: 'JPY' },
   'EURCHF': { base: 'EUR', quote: 'CHF' },
   'EURAUD': { base: 'EUR', quote: 'AUD' },
+  'EURCAD': { base: 'EUR', quote: 'CAD' },
+  'EURNZD': { base: 'EUR', quote: 'NZD' },
   'AUDCAD': { base: 'AUD', quote: 'CAD' },
   'AUDJPY': { base: 'AUD', quote: 'JPY' },
+  'AUDNZD': { base: 'AUD', quote: 'NZD' },
+  'AUDCHF': { base: 'AUD', quote: 'CHF' },
   'CADJPY': { base: 'CAD', quote: 'JPY' },
+  'CADCHF': { base: 'CAD', quote: 'CHF' },
+  'CHFJPY': { base: 'CHF', quote: 'JPY' },
+  'NZDJPY': { base: 'NZD', quote: 'JPY' },
+  'NZDCAD': { base: 'NZD', quote: 'CAD' },
+  'NZDCHF': { base: 'NZD', quote: 'CHF' },
+  'GBPAUD': { base: 'GBP', quote: 'AUD' },
+  'GBPCAD': { base: 'GBP', quote: 'CAD' },
+  'GBPCHF': { base: 'GBP', quote: 'CHF' },
+  'GBPNZD': { base: 'GBP', quote: 'NZD' },
+  // Exotic pairs
+  'USDSGD': { base: 'USD', quote: 'SGD' },
+  'USDHKD': { base: 'USD', quote: 'HKD' },
+  'USDZAR': { base: 'USD', quote: 'ZAR' },
+  'USDTRY': { base: 'USD', quote: 'TRY' },
+  'USDMXN': { base: 'USD', quote: 'MXN' },
+  'USDPLN': { base: 'USD', quote: 'PLN' },
+  'USDSEK': { base: 'USD', quote: 'SEK' },
+  'USDNOK': { base: 'USD', quote: 'NOK' },
+  'USDDKK': { base: 'USD', quote: 'DKK' },
+  'USDCNH': { base: 'USD', quote: 'CNH' },
+  'EURPLN': { base: 'EUR', quote: 'PLN' },
+  'EURSEK': { base: 'EUR', quote: 'SEK' },
+  'EURNOK': { base: 'EUR', quote: 'NOK' },
+  'EURDKK': { base: 'EUR', quote: 'DKK' },
+  'EURTRY': { base: 'EUR', quote: 'TRY' },
+  'EURZAR': { base: 'EUR', quote: 'ZAR' },
+  'GBPSEK': { base: 'GBP', quote: 'SEK' },
+  'GBPNOK': { base: 'GBP', quote: 'NOK' },
+  // Metals
   'XAUUSD': { base: 'XAU', quote: 'USD' },
   'XAGUSD': { base: 'XAG', quote: 'USD' },
+  'XAUEUR': { base: 'XAU', quote: 'EUR' },
+  'XAUAUD': { base: 'XAU', quote: 'AUD' },
+  'XAUGBP': { base: 'XAU', quote: 'GBP' },
+  'XAUCHF': { base: 'XAU', quote: 'CHF' },
+  'XAUJPY': { base: 'XAU', quote: 'JPY' },
+  'XAGEUR': { base: 'XAG', quote: 'EUR' },
 }
 
 async function fetchForexPrices() {
@@ -103,7 +144,12 @@ async function fetchForexPrices() {
       'AUD': 'aud', 'NZD': 'nzd', 'CAD': 'cad', 'SGD': 'sgd',
       'HKD': 'hkd', 'ZAR': 'zar', 'TRY': 'try', 'MXN': 'mxn',
       'PLN': 'pln', 'SEK': 'sek', 'NOK': 'nok', 'DKK': 'dkk',
-      'CNH': 'cny', 'XAU': 'xau', 'XAG': 'xag'
+      'CNH': 'cny', 'CNY': 'cny', 'XAU': 'xau', 'XAG': 'xag',
+      'RUB': 'rub', 'INR': 'inr', 'THB': 'thb', 'IDR': 'idr',
+      'MYR': 'myr', 'PHP': 'php', 'KRW': 'krw', 'TWD': 'twd',
+      'BRL': 'brl', 'CLP': 'clp', 'COP': 'cop', 'PEN': 'pen',
+      'ARS': 'ars', 'CZK': 'czk', 'HUF': 'huf', 'ILS': 'ils',
+      'SAR': 'sar', 'AED': 'aed', 'KWD': 'kwd', 'QAR': 'qar'
     }
     
     for (const [symbol, pair] of Object.entries(FOREX_PAIRS)) {
@@ -188,17 +234,26 @@ router.get('/instruments', async (req, res) => {
     const priceCache = metaApiService.getPriceCache()
     const symbolsWithPrices = Array.from(priceCache.keys())
     
-    // If MetaApi has live data, use those symbols
-    // Otherwise, fall back to ALL known symbols so the UI isn't empty
-    const symbolList = symbolsWithPrices.length > 0
-      ? symbolsWithPrices
-      : [...new Set([
-          ...metaApiService.FOREX_SYMBOLS,
-          ...metaApiService.METAL_SYMBOLS,
-          ...metaApiService.ENERGY_SYMBOLS,
-          ...metaApiService.CRYPTO_SYMBOLS,
-          ...metaApiService.STOCK_SYMBOLS
-        ])]
+    // ALWAYS include all popular instruments from ALL categories
+    // This ensures Metals, Crypto, Energy, Stocks tabs are never empty
+    const allPopularSymbols = [
+      ...POPULAR_INSTRUMENTS.Forex,
+      ...POPULAR_INSTRUMENTS.Metals,
+      ...POPULAR_INSTRUMENTS.Energy,
+      ...POPULAR_INSTRUMENTS.Crypto,
+      ...POPULAR_INSTRUMENTS.Stocks
+    ]
+    
+    // Combine: symbols with live prices + all popular symbols
+    const symbolList = [...new Set([
+      ...symbolsWithPrices,
+      ...allPopularSymbols,
+      ...metaApiService.FOREX_SYMBOLS,
+      ...metaApiService.METAL_SYMBOLS,
+      ...metaApiService.ENERGY_SYMBOLS,
+      ...metaApiService.CRYPTO_SYMBOLS,
+      ...metaApiService.STOCK_SYMBOLS
+    ])]
     
     const instruments = symbolList.map(symbol => {
       const category = categorizeSymbol(symbol)
@@ -216,7 +271,7 @@ router.get('/instruments', async (req, res) => {
       }
     })
     
-    console.log('[MetaApi] Returning', instruments.length, 'instruments', symbolsWithPrices.length > 0 ? '(live)' : '(fallback)')
+    console.log('[MetaApi] Returning', instruments.length, 'instruments (live:', symbolsWithPrices.length, ')')
     res.json({ success: true, instruments })
   } catch (error) {
     console.error('[MetaApi] Error fetching instruments:', error)
