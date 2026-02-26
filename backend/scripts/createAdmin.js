@@ -1,9 +1,7 @@
-import mongoose from 'mongoose'
-import bcrypt from 'bcryptjs'
-import dotenv from 'dotenv'
-import Admin from '../models/Admin.js'
-
-dotenv.config()
+const mongoose = require('mongoose')
+const bcrypt = require('bcryptjs')
+require('dotenv').config()
+const Admin = require('../models/Admin.js')
 
 // Admin credentials
 const ADMIN_EMAIL = 'admin@unicap.com'
