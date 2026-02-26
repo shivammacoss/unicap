@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 const paymentMethodSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['Bank Transfer', 'UPI', 'QR Code'],
+    enum: ['Bank Transfer', 'UPI', 'QR Code', 'Infoway'],
     required: true
   },
   // Bank Transfer fields
@@ -25,6 +25,13 @@ const paymentMethodSchema = new mongoose.Schema({
   },
   // QR Code fields
   qrCodeImage: {
+    type: String
+  },
+  // Infoway fields
+  apiKey: {
+    type: String
+  },
+  merchantId: {
     type: String
   },
   // Common fields

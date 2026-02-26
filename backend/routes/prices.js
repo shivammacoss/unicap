@@ -1,7 +1,10 @@
 import dotenv from 'dotenv'
 dotenv.config()
 import express from 'express'
-import metaApiService from '../services/metaApiService.js'
+import infowayPriceService from '../services/infowayPriceService.js'
+
+// Use the price service cache directly - no separate Infoway API calls needed
+// The infowayPriceService handles all price fetching via Binance + Exchange Rate APIs
 
 // Binance symbol mapping for fallback pricing
 const BINANCE_MAP = {
@@ -200,9 +203,9 @@ const POPULAR_INSTRUMENTS = {
   Stocks: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD']
 }
 
-// Use MetaApi service for categorization
+// Use Infoway service for categorization
 function categorizeSymbol(symbol) {
-  return metaApiService.categorizeSymbol(symbol)
+  return infowayPriceService.categorizeSymbol(symbol)
 }
 
 // Default instruments fallback
@@ -228,10 +231,10 @@ function getDefaultInstruments() {
 // GET /api/prices/instruments - Get all available instruments
 router.get('/instruments', async (req, res) => {
   try {
-    console.log('[MetaApi] Returning supported instruments')
+    console.log('[Infoway] Returning supported instruments')
     
-    // Get price cache from MetaApi service
-    const priceCache = metaApiService.getPriceCache()
+    // Get price cache from Infoway service
+    const priceCache = infowayPriceService.getPriceCache()
     const symbolsWithPrices = Array.from(priceCache.keys())
     
     // ALWAYS include all popular instruments from ALL categories
@@ -247,12 +250,7 @@ router.get('/instruments', async (req, res) => {
     // Combine: symbols with live prices + all popular symbols
     const symbolList = [...new Set([
       ...symbolsWithPrices,
-      ...allPopularSymbols,
-      ...metaApiService.FOREX_SYMBOLS,
-      ...metaApiService.METAL_SYMBOLS,
-      ...metaApiService.ENERGY_SYMBOLS,
-      ...metaApiService.CRYPTO_SYMBOLS,
-      ...metaApiService.STOCK_SYMBOLS
+      ...allPopularSymbols
     ])]
     
     const instruments = symbolList.map(symbol => {
@@ -271,10 +269,10 @@ router.get('/instruments', async (req, res) => {
       }
     })
     
-    console.log('[MetaApi] Returning', instruments.length, 'instruments (live:', symbolsWithPrices.length, ')')
+    console.log('[Infoway] Returning', instruments.length, 'instruments (live:', symbolsWithPrices.length, ')')
     res.json({ success: true, instruments })
   } catch (error) {
-    console.error('[MetaApi] Error fetching instruments:', error)
+    console.error('[Infoway] Error fetching instruments:', error)
     res.json({ success: true, instruments: getDefaultInstruments() })
   }
 })
@@ -350,15 +348,10 @@ router.get('/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params
     
-    // 1. Try MetaApi cache
-    let price = metaApiService.getPrice(symbol)
+    // 1. Try price service cache first (primary source)
+    let price = infowayPriceService.getPrice(symbol)
     
-    // 2. Try MetaApi terminal state
-    if (!price) {
-      price = await metaApiService.fetchPriceREST(symbol)
-    }
-    
-    // 3. Fallback to Binance/Forex
+    // 2. Fallback to Binance/Forex if not in cache
     if (!price) {
       const binancePrices = await fetchBinancePrices()
       const bp = binancePrices.get(symbol)
@@ -390,29 +383,19 @@ router.post('/batch', async (req, res) => {
     }
     
     const prices = {}
-    const missingSymbols = []
+    const missingSymbols = [...symbols]
     
-    // 1. Try MetaApi cache first
-    for (const symbol of symbols) {
-      const cached = metaApiService.getPrice(symbol)
+    // 1. Try price service cache first (primary source)
+    for (const symbol of [...missingSymbols]) {
+      const cached = infowayPriceService.getPrice(symbol)
       if (cached) {
         prices[symbol] = { bid: cached.bid, ask: cached.ask }
-      } else {
-        missingSymbols.push(symbol)
-      }
-    }
-    
-    // 2. Try MetaApi terminal state for missing
-    if (missingSymbols.length > 0) {
-      const batchPrices = await metaApiService.fetchBatchPricesREST(missingSymbols)
-      for (const [symbol, price] of Object.entries(batchPrices)) {
-        prices[symbol] = { bid: price.bid, ask: price.ask }
         const idx = missingSymbols.indexOf(symbol)
         if (idx > -1) missingSymbols.splice(idx, 1)
       }
     }
     
-    // 3. Fallback: Binance for crypto, exchangerate for forex/metals
+    // 2. Fallback: Binance for crypto, exchangerate for forex/metals
     if (missingSymbols.length > 0) {
       const [binancePrices, forexPrices] = await Promise.all([
         fetchBinancePrices(),

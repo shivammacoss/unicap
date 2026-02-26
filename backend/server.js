@@ -32,12 +32,13 @@ import bannerRoutes from './routes/banner.js'
 import employeeRoutes from './routes/employee.js'
 import employeeManagementRoutes from './routes/employeeManagement.js'
 import oxapayRoutes from './routes/oxapay.js'
+import infowayRoutes from './routes/infoway.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
-import metaApiService from './services/metaApiService.js'
+import infowayPriceService from './services/infowayPriceService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -59,32 +60,31 @@ const io = new Server(httpServer, {
 const connectedClients = new Map()
 const priceSubscribers = new Set()
 
-// Price cache for real-time streaming (shared with MetaApi service)
-const priceCache = metaApiService.getPriceCache()
+// Price cache for real-time streaming
+const priceCache = infowayPriceService.getPriceCache()
 
-// MetaApi handles all asset classes: Forex, Crypto, Metals, Energy, Stocks
+// Price service handles: Forex, Crypto, Metals via Binance + Exchange Rate APIs
 
-// MetaApi tick-by-tick price update handler - emit to frontend via Socket.IO
-metaApiService.setOnPriceUpdate((symbol, price) => {
+// Price update handler - emit to frontend via Socket.IO
+infowayPriceService.setOnPriceUpdate((symbol, price) => {
   if (priceSubscribers.size > 0) {
-    // Emit individual price update for tick-to-tick
     io.to('prices').emit('priceUpdate', { symbol, price })
-    // Also emit as priceStream for compatibility (single symbol update)
-    io.to('prices').emit('priceStream', {
-      prices: { [symbol]: price },
-      updated: { [symbol]: true },
-      timestamp: Date.now()
-    })
   }
 })
 
-// MetaApi connection status handler
-metaApiService.setOnConnectionChange((connected) => {
-  console.log(`[MetaApi] ${connected ? 'Connected' : 'Disconnected'}`)
-})
+// Broadcast ALL prices every 2 seconds for reliable updates
+setInterval(() => {
+  if (priceSubscribers.size > 0 && priceCache.size > 0) {
+    const prices = {}
+    priceCache.forEach((data, symbol) => {
+      prices[symbol] = { bid: data.bid, ask: data.ask }
+    })
+    io.to('prices').emit('priceStream', { prices, timestamp: Date.now() })
+  }
+}, 2000)
 
-// Start MetaApi streaming connection
-metaApiService.connect()
+// Start price streaming connection
+infowayPriceService.connect()
 
 // Background stop-out check every 5 seconds
 setInterval(async () => {
@@ -221,6 +221,7 @@ app.use('/api/banners', bannerRoutes)
 app.use('/api/employee', employeeRoutes)
 app.use('/api/employee-mgmt', employeeManagementRoutes)
 app.use('/api/oxapay', oxapayRoutes)
+app.use('/api/infoway', infowayRoutes)
 
 // App version check endpoint
 app.get('/api/app-version', (req, res) => {
