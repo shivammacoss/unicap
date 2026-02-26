@@ -22,12 +22,36 @@ su - unicap
 
 ## Step 3: Update System
 
+### For CentOS/RHEL (yum):
+```bash
+sudo yum update -y
+sudo yum upgrade -y
+```
+
+### For Ubuntu/Debian (apt):
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
 ## Step 4: Install Node.js 20 LTS
 
+### For CentOS/RHEL (yum):
+```bash
+# Install curl if not present
+sudo yum install curl -y
+
+# Add NodeSource repository
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+
+# Install Node.js
+sudo yum install nodejs -y
+
+# Verify installation
+node --version
+npm --version
+```
+
+### For Ubuntu/Debian (apt):
 ```bash
 # Install curl if not present
 sudo apt install curl -y
@@ -44,6 +68,31 @@ npm --version
 ```
 
 ## Step 5: Install MongoDB
+
+### For CentOS/RHEL (yum) - MongoDB 7.0:
+```bash
+# Create MongoDB repository
+sudo tee /etc/yum.repos.d/mongodb-org-7.0.repo << 'EOF'
+[mongodb-org-7.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/$releasever/mongodb-org/7.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
+EOF
+
+# Install MongoDB
+sudo yum install -y mongodb-org
+
+# Start MongoDB
+sudo systemctl start mongod
+
+# Enable MongoDB to start on boot
+sudo systemctl enable mongod
+
+# Verify MongoDB is running
+sudo systemctl status mongod
+```
 
 ### For Ubuntu 24.04 Noble (MongoDB 8.0)
 ```bash
@@ -83,6 +132,12 @@ sudo npm install -g pm2
 
 ## Step 7: Install Git
 
+### For CentOS/RHEL (yum):
+```bash
+sudo yum install git -y
+```
+
+### For Ubuntu/Debian (apt):
 ```bash
 sudo apt install git -y
 ```
@@ -178,7 +233,12 @@ pm2 start "serve -s dist -l 5173" --name unicap-frontend
 
 ### Option B: Using Nginx (Recommended for Production)
 ```bash
-sudo apt install nginx
+# For CentOS/RHEL:
+sudo yum install epel-release -y
+sudo yum install nginx -y
+
+# For Ubuntu/Debian:
+sudo apt install nginx -y
 
 # Configure nginx
 sudo nano /etc/nginx/sites-available/unicap
@@ -227,6 +287,18 @@ sudo systemctl restart nginx
 
 ## Step 7: Configure Firewall
 
+### For CentOS/RHEL (firewalld):
+```bash
+# Allow required ports
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --permanent --add-port=5001/tcp  # Backend API
+sudo firewall-cmd --permanent --add-port=5173/tcp  # Frontend
+sudo firewall-cmd --reload
+```
+
+### For Ubuntu/Debian (ufw):
 ```bash
 # Allow required ports
 sudo ufw allow 22    # SSH
@@ -289,6 +361,11 @@ When you add a domain:
 4. Rebuild frontend: `npm run build`
 5. Configure SSL with Certbot:
    ```bash
-   sudo apt install certbot python3-certbot-nginx
+   # For CentOS/RHEL:
+   sudo yum install certbot python3-certbot-nginx -y
+   
+   # For Ubuntu/Debian:
+   sudo apt install certbot python3-certbot-nginx -y
+   
    sudo certbot --nginx -d yourdomain.com
    ```
