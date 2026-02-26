@@ -39,3 +39,6 @@ coverage/
 *.seed
 *.pid.lock
 .cache/
+
+# Mobile app (separate repository)
+unicap-mobile-apk/
