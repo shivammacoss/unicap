@@ -272,7 +272,7 @@ class CopyTradingEngine {
         )
 
         // Record successful copy trade
-        await CopyTrade.create({
+        const copyTradeRecord = await CopyTrade.create({
           masterTradeId: masterTrade._id,
           masterId: masterId,
           followerTradeId: followerTrade._id,
@@ -288,8 +288,10 @@ class CopyTradingEngine {
           masterOpenPrice: masterTrade.openPrice,
           followerOpenPrice: followerTrade.openPrice,
           status: 'OPEN',
+          openedAt: new Date(),
           tradingDay
         })
+        console.log(`[CopyTrade] Created CopyTrade record: ${copyTradeRecord._id}, masterTradeId: ${masterTrade._id}`)
 
         // Update follower stats
         follower.stats.totalCopiedTrades += 1
@@ -366,12 +368,19 @@ class CopyTradingEngine {
   async closeFollowerTrades(masterTradeId, masterClosePrice) {
     console.log(`[CopyTrade] closeFollowerTrades called with masterTradeId: ${masterTradeId}, price: ${masterClosePrice}`)
     
+    // Debug: Check all copy trades for this master trade
+    const allCopyTrades = await CopyTrade.find({ masterTradeId })
+    console.log(`[CopyTrade] Total copy trades for masterTradeId ${masterTradeId}: ${allCopyTrades.length}`)
+    allCopyTrades.forEach(ct => {
+      console.log(`[CopyTrade] CopyTrade ${ct._id}: status=${ct.status}, followerTradeId=${ct.followerTradeId}`)
+    })
+    
     const copyTrades = await CopyTrade.find({
       masterTradeId,
       status: 'OPEN'
     })
 
-    console.log(`[CopyTrade] Found ${copyTrades.length} open copy trades to close for master trade ${masterTradeId}`)
+    console.log(`[CopyTrade] Found ${copyTrades.length} OPEN copy trades to close for master trade ${masterTradeId}`)
 
     // Process ALL in parallel for instant close
     const results = await Promise.all(copyTrades.map(async (copyTrade) => {
