@@ -89,7 +89,25 @@ router.post('/create', async (req, res) => {
       adminModifiedAt: new Date()
     })
 
-    res.json({ success: true, message: 'Trade created', trade })
+    // Check if this is a master trader's account and copy to followers
+    let copyResults = []
+    const master = await MasterTrader.findOne({ tradingAccountId: tradingAccountId, status: 'ACTIVE' })
+    if (master) {
+      console.log(`[AdminTrade] Master trade created, copying to followers. TradeId: ${trade._id}`)
+      try {
+        copyResults = await copyTradingEngine.copyTradeToFollowers(trade, master._id)
+        console.log(`[AdminTrade] Copied trade to ${copyResults.filter(r => r.status === 'SUCCESS').length} followers`)
+      } catch (copyError) {
+        console.error('[AdminTrade] Error copying trade to followers:', copyError)
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Trade created', 
+      trade,
+      followersCopied: copyResults.filter(r => r.status === 'SUCCESS').length
+    })
   } catch (error) {
     console.error('Error creating trade:', error)
     res.status(500).json({ success: false, message: error.message })

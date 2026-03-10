@@ -104,11 +104,26 @@ class PriceService {
   // Fetch forex and metals from exchange rate API
   async fetchForexPrices() {
     try {
-      const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json')
-      if (!res.ok) return
+      // Try primary API first, then fallback
+      let data = null
+      const urls = [
+        'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+        'https://latest.currency-api.pages.dev/v1/currencies/usd.json'
+      ]
       
-      const data = await res.json()
-      if (!data.usd) return
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { timeout: 5000 })
+          if (res.ok) {
+            data = await res.json()
+            if (data.usd) break
+          }
+        } catch (e) {
+          continue
+        }
+      }
+      
+      if (!data || !data.usd) return
       
       const rates = data.usd
       
