@@ -394,6 +394,24 @@ class TradeEngine {
 
     await trade.save()
 
+    // Check if this is a master trader's trade and close follower trades
+    let followerResults = []
+    if (closedBy === 'ADMIN') {
+      const MasterTrader = await import('../models/MasterTrader.js').then(m => m.default)
+      const copyTradingEngine = await import('./copyTradingEngine.js').then(m => m.default)
+      
+      const master = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId, status: 'ACTIVE' })
+      if (master) {
+        console.log(`[TradeEngine] Admin closed master trade, propagating to followers. TradeId: ${tradeId}, ClosePrice: ${closePrice}`)
+        try {
+          followerResults = await copyTradingEngine.closeFollowerTrades(trade._id, closePrice)
+          console.log(`[TradeEngine] Closed ${followerResults.length} follower trades`)
+        } catch (copyError) {
+          console.error('[TradeEngine] Error closing follower trades:', copyError)
+        }
+      }
+    }
+
     // Update account balance with proper credit handling
     const account = await TradingAccount.findById(trade.tradingAccountId)
     
@@ -440,10 +458,7 @@ class TradeEngine {
       console.error('Error processing IB commission:', ibError)
     }
 
-    // Close follower trades if this is a master trade
-    this.closeFollowerTradesAsync(trade._id, closePrice)
-
-    return { trade, realizedPnl }
+    return { trade, realizedPnl, followerResults }
   }
 
   // Async close follower trades (non-blocking)
@@ -507,6 +522,24 @@ class TradeEngine {
 
     await trade.save()
 
+    // Check if this is a master trader's trade and mirror SL/TP to followers
+    let followerResults = []
+    if (adminId) {
+      const MasterTrader = await import('../models/MasterTrader.js').then(m => m.default)
+      const copyTradingEngine = await import('./copyTradingEngine.js').then(m => m.default)
+      
+      const master = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId, status: 'ACTIVE' })
+      if (master) {
+        console.log(`[TradeEngine] Admin modified master trade SL/TP, propagating to followers. TradeId: ${trade._id}, SL: ${sl}, TP: ${tp}`)
+        try {
+          followerResults = await copyTradingEngine.mirrorSlTpModification(trade._id, sl, tp)
+          console.log(`[TradeEngine] Updated SL/TP for ${followerResults.filter(r => r.status === 'SUCCESS').length} follower trades`)
+        } catch (copyError) {
+          console.error('[TradeEngine] Error mirroring SL/TP to followers:', copyError)
+        }
+      }
+    }
+
     // Log admin action
     if (adminId) {
       await AdminLog.create({
@@ -519,7 +552,7 @@ class TradeEngine {
       })
     }
 
-    return trade
+    return { trade, followerResults }
   }
 
   // Check and execute stop-out

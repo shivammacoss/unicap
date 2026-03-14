@@ -415,14 +415,18 @@ router.post('/trades/close', async (req, res) => {
       targetType: 'TRADE',
       targetId: tradeId,
       reason: reason || 'Admin closed trade',
-      newValue: { realizedPnl: result.realizedPnl }
+      newValue: { 
+        realizedPnl: result.realizedPnl,
+        followersClosed: result.followerResults?.length || 0
+      }
     })
 
     res.json({
       success: true,
       message: 'Trade closed by admin',
       trade: result.trade,
-      realizedPnl: result.realizedPnl
+      realizedPnl: result.realizedPnl,
+      followersClosed: result.followerResults?.length || 0
     })
   } catch (error) {
     console.error('Error closing trade:', error)
@@ -452,7 +456,8 @@ router.put('/trades/modify', async (req, res) => {
     res.json({
       success: true,
       message: 'Trade modified by admin',
-      trade
+      trade: trade.trade,
+      followersUpdated: trade.followerResults?.filter(r => r.status === 'SUCCESS')?.length || 0
     })
   } catch (error) {
     console.error('Error modifying trade:', error)
@@ -489,6 +494,24 @@ router.post('/trades/force-close-all', async (req, res) => {
       }
     }
 
+    // Check if this is a master trader's account and close all follower trades
+    let totalFollowersClosed = 0
+    const master = await MasterTrader.findOne({ tradingAccountId, status: 'ACTIVE' })
+    if (master) {
+      console.log(`[AdminTrade] Force closing all master trades, propagating to followers. AccountId: ${tradingAccountId}`)
+      try {
+        for (const trade of openTrades) {
+          const tradePrice = prices[trade.symbol]
+          if (tradePrice) {
+            const followerResults = await copyTradingEngine.closeFollowerTrades(trade._id, tradePrice.bid)
+            totalFollowersClosed += followerResults.length
+          }
+        }
+      } catch (copyError) {
+        console.error('[AdminTrade] Error closing follower trades in force-close-all:', copyError)
+      }
+    }
+
     // Log the action
     await AdminLog.create({
       adminId,
@@ -496,13 +519,17 @@ router.post('/trades/force-close-all', async (req, res) => {
       targetType: 'ACCOUNT',
       targetId: tradingAccountId,
       reason: reason || 'Admin force closed all trades',
-      newValue: { closedCount: closedTrades.length }
+      newValue: { 
+        closedCount: closedTrades.length,
+        followersClosed: totalFollowersClosed
+      }
     })
 
     res.json({
       success: true,
-      message: `Force closed ${closedTrades.length} trades`,
-      closedTrades
+      message: `Force closed ${closedTrades.length} trades${totalFollowersClosed > 0 ? ` and ${totalFollowersClosed} follower trades` : ''}`,
+      closedTrades,
+      followersClosed: totalFollowersClosed
     })
   } catch (error) {
     console.error('Error force closing trades:', error)
