@@ -319,7 +319,7 @@ class TradeEngine {
     const tradeId = await Trade.generateTradeId()
 
     // Create trade
-    const trade = await Trade.create({
+    const tradeData = {
       userId,
       tradingAccountId,
       tradeId,
@@ -340,7 +340,18 @@ class TradeEngine {
       floatingPnl: 0,
       status: orderType === 'MARKET' ? 'OPEN' : 'PENDING',
       pendingPrice: orderType !== 'MARKET' ? openPrice : null
-    })
+    }
+
+    // Add copy trade metadata if provided
+    if (options && options.isCopyTrade) {
+      tradeData.isCopyTrade = true
+      tradeData.masterTradeId = options.masterTradeId
+      tradeData.masterOpenPrice = options.masterOpenPrice
+      tradeData.copyMode = options.copyMode
+      tradeData.masterLotSize = options.masterLotSize
+    }
+
+    const trade = await Trade.create(tradeData)
 
     // Deduct commission from trading account balance when trade opens
     if (orderType === 'MARKET' && commission > 0) {

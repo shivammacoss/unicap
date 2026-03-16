@@ -105,13 +105,39 @@ const tradeSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  currentPnl: {
+    type: Number,
+    default: 0
+  },
   realizedPnl: {
+    type: Number,
+    default: null
+  },
+  isCopyTrade: {
+    type: Boolean,
+    default: false
+  },
+  masterTradeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Trade',
+    default: null
+  },
+  masterOpenPrice: {
+    type: Number,
+    default: null
+  },
+  copyMode: {
+    type: String,
+    enum: ['FIXED_LOT', 'BALANCE_BASED', 'EQUITY_BASED', 'MULTIPLIER', 'AUTO'],
+    default: null
+  },
+  masterLotSize: {
     type: Number,
     default: null
   },
   status: {
     type: String,
-    enum: ['OPEN', 'CLOSED', 'PENDING', 'CANCELLED'],
+    enum: ['OPEN', 'CLOSED', 'PENDING'],
     default: 'OPEN'
   },
   pendingPrice: {

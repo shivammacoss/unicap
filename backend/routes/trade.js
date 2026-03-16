@@ -414,7 +414,8 @@ router.get('/open/:tradingAccountId', async (req, res) => {
     const trades = await Trade.find({ 
       tradingAccountId, 
       status: 'OPEN' 
-    }).sort({ openedAt: -1 })
+    }).populate('masterTradeId', 'tradeId openPrice quantity')
+    .sort({ openedAt: -1 })
 
     res.json({
       success: true,

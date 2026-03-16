@@ -268,7 +268,16 @@ class CopyTradingEngine {
           masterTrade.openPrice, // Use master's price as bid
           masterTrade.openPrice, // Use master's price as ask
           masterTrade.stopLoss,
-          masterTrade.takeProfit
+          masterTrade.takeProfit,
+          null, // No leverage override
+          {
+            // Add metadata for copy trade
+            isCopyTrade: true,
+            masterTradeId: masterTrade._id,
+            masterOpenPrice: masterTrade.openPrice,
+            copyMode: follower.copyMode,
+            masterLotSize: masterTrade.quantity
+          }
         )
 
         // Record successful copy trade
