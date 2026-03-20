@@ -12,8 +12,10 @@ import toast from 'react-hot-toast'
 import LanguageDropdown from '../components/LanguageDropdown'
 import UserHeader from '../components/UserHeader'
 import BannerSlider from '../components/BannerSlider'
+import { useLockDocumentScroll } from '../hooks/useLockDocumentScroll'
 
 const SupportPage = () => {
+  useLockDocumentScroll()
   const navigate = useNavigate()
   const { isDarkMode, toggleDarkMode } = useTheme()
   const { t } = useTranslation()
@@ -168,7 +170,7 @@ const SupportPage = () => {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${isDarkMode ? 'bg-dark-900' : 'bg-gray-100'}`}>
+    <div className={`flex h-[100dvh] max-h-[100dvh] min-h-0 w-full flex-col overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-dark-900' : 'bg-gray-100'}`}>
       {/* Mobile Header */}
       {isMobile && (
         <header className={`fixed top-0 left-0 right-0 z-40 px-4 py-3 flex items-center gap-4 ${isDarkMode ? 'bg-dark-800 border-b border-gray-800' : 'bg-white border-b border-gray-200'}`}>
@@ -187,7 +189,7 @@ const SupportPage = () => {
 
       {/* Full Width Header - Desktop Only */}
       {!isMobile && (
-        <div className="w-full relative border-b bg-gradient-to-r from-dark-800 via-dark-900 to-dark-800 border-gray-800">
+        <div className="w-full shrink-0 relative border-b bg-gradient-to-r from-dark-800 via-dark-900 to-dark-800 border-gray-800">
           <div className="flex items-center justify-between px-6 py-3">
             <img src={logoImage} alt="BlueStone" className="h-8 w-auto object-contain" />
             <UserHeader />
@@ -196,15 +198,15 @@ const SupportPage = () => {
       )}
 
       {/* Main Layout - Sidebar + Content */}
-      <div className={`flex-1 flex overflow-hidden ${isMobile ? 'flex-col' : ''}`}>
+      <div className={`flex-1 flex min-h-0 overflow-hidden ${isMobile ? 'flex-col' : ''}`}>
         {/* Sidebar - Hidden on Mobile */}
         {!isMobile && (
           <aside 
-            className={`${sidebarExpanded ? 'w-48' : 'w-16'} ${isDarkMode ? 'bg-dark-900 border-gray-800' : 'bg-white border-gray-200'} border-r flex flex-col transition-all duration-300`}
+            className={`${sidebarExpanded ? 'w-48' : 'w-16'} ${isDarkMode ? 'bg-dark-900 border-gray-800' : 'bg-white border-gray-200'} border-r flex flex-col shrink-0 min-h-0 overflow-hidden transition-all duration-300`}
             onMouseEnter={() => setSidebarExpanded(true)}
             onMouseLeave={() => setSidebarExpanded(false)}
           >
-            <nav className="flex-1 px-2 pt-4">
+            <nav className="hide-scrollbar flex-1 min-h-0 overflow-y-auto px-2 pt-4">
               {menuItems.map((item) => (
                 <button
                   key={item.name}
@@ -218,7 +220,7 @@ const SupportPage = () => {
                 </button>
               ))}
             </nav>
-            <div className={`p-2 border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+            <div className={`p-2 border-t shrink-0 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
               <button onClick={handleLogout} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-dark-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}>
                 <LogOut size={18} />
                 {sidebarExpanded && <span className="text-sm">{t('nav.logout')}</span>}
@@ -228,7 +230,7 @@ const SupportPage = () => {
         )}
 
         {/* Main Content */}
-        <main className={`flex-1 overflow-auto ${isMobile ? 'pt-14' : ''}`}>
+        <main className={`hide-scrollbar flex-1 min-h-0 overflow-y-auto ${isMobile ? 'pt-14' : ''}`}>
           <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
           {/* Tabs */}
           <div className={`flex ${isMobile ? 'gap-2' : 'gap-4'} mb-4`}>

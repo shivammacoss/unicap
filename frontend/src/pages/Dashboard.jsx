@@ -32,8 +32,10 @@ import logoImage from '../assets/logo.png'
 import BannerSlider from '../components/BannerSlider'
 import LanguageDropdown from '../components/LanguageDropdown'
 import UserHeader from '../components/UserHeader'
+import { useLockDocumentScroll } from '../hooks/useLockDocumentScroll'
 
 const Dashboard = () => {
+  useLockDocumentScroll()
   const navigate = useNavigate()
   const { isDarkMode, toggleDarkMode } = useTheme()
   const { t } = useTranslation()
@@ -475,9 +477,9 @@ const Dashboard = () => {
   }, [isDarkMode])
 
   return (
-    <div className={`h-screen flex flex-col transition-colors duration-300 ${isDarkMode ? 'bg-dark-900' : 'bg-gray-100'}`}>
+    <div className={`flex h-[100dvh] max-h-[100dvh] min-h-0 w-full flex-col overflow-hidden transition-colors duration-300 ${isDarkMode ? 'bg-dark-900' : 'bg-gray-100'}`}>
       {/* Full Width Header */}
-      <div className="w-full relative border-b bg-gradient-to-r from-dark-800 via-dark-900 to-dark-800 border-gray-800">
+      <div className="w-full shrink-0 relative border-b bg-gradient-to-r from-dark-800 via-dark-900 to-dark-800 border-gray-800">
         <div className="flex items-center justify-between px-6 py-3">
           <img src={logoImage} alt="BlueStone" className="h-8 w-auto object-contain" />
           <UserHeader />
@@ -485,15 +487,15 @@ const Dashboard = () => {
       </div>
 
       {/* Main Layout - Sidebar + Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Collapsible Sidebar - Fixed */}
         <aside 
-          className={`${sidebarExpanded ? 'w-48' : 'w-16'} ${isDarkMode ? 'bg-dark-900 border-gray-800' : 'bg-white border-gray-200'} border-r flex flex-col transition-all duration-300 ease-in-out`}
+          className={`${sidebarExpanded ? 'w-48' : 'w-16'} ${isDarkMode ? 'bg-dark-900 border-gray-800' : 'bg-white border-gray-200'} border-r flex flex-col shrink-0 min-h-0 overflow-hidden transition-all duration-300 ease-in-out`}
           onMouseEnter={() => setSidebarExpanded(true)}
           onMouseLeave={() => setSidebarExpanded(false)}
         >
           {/* Menu */}
-        <nav className="flex-1 px-2 pt-4 overflow-y-auto">
+        <nav className="hide-scrollbar flex-1 min-h-0 overflow-y-auto px-2 pt-4">
           {menuItems.map((item) => (
             <button
               key={item.name}
@@ -527,7 +529,7 @@ const Dashboard = () => {
         </aside>
 
         {/* Main Content - Scrollable */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="hide-scrollbar flex-1 min-h-0 overflow-y-auto">
           {/* Dashboard Content */}
           <div className="p-6">
           {/* Banner Slider */}

@@ -28,8 +28,10 @@ import {
   User
 } from 'lucide-react'
 import logoImage from '../assets/logo.png'
+import { useLockDocumentScroll } from '../hooks/useLockDocumentScroll'
 
 const AdminLayout = ({ children, title, subtitle }) => {
+  useLockDocumentScroll()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
@@ -116,7 +118,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900 flex">
+    <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 w-full overflow-hidden bg-dark-900">
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -131,12 +133,12 @@ const AdminLayout = ({ children, title, subtitle }) => {
           fixed lg:static inset-y-0 left-0 z-50
           ${sidebarExpanded ? 'w-64' : 'w-16'} 
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          bg-dark-900 border-r border-gray-800 flex flex-col 
+          bg-dark-900 border-r border-gray-800 flex flex-col shrink-0 min-h-0 overflow-hidden
           transition-all duration-300 ease-in-out
         `}
       >
-        {/* Logo */}
-        <div className="p-4 flex items-center justify-between border-b border-gray-800">
+        {/* Logo — min-height matches main header so border-b aligns across columns */}
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-800 px-4 py-4 lg:min-h-[5.5rem]">
           <div className="flex items-center gap-2">
             {sidebarExpanded && <img src={logoImage} alt="BlueStone" className="h-8 w-auto object-contain flex-shrink-0" />}
           </div>
@@ -155,7 +157,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
         </div>
 
         {/* Menu */}
-        <nav className="flex-1 px-2 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700">
+        <nav className="hide-scrollbar flex-1 min-h-0 overflow-y-auto px-2 py-4">
           {menuItems.map((item) => (
             <button
               key={item.name}
@@ -179,7 +181,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
         </nav>
 
         {/* Logout */}
-        <div className="p-2 border-t border-gray-800">
+        <div className="p-2 border-t border-gray-800 shrink-0">
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-400 hover:text-white hover:bg-dark-700 transition-colors rounded-lg"
@@ -192,9 +194,9 @@ const AdminLayout = ({ children, title, subtitle }) => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto min-w-0">
+      <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-dark-900/95 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-800">
+        <header className="flex shrink-0 items-center justify-between border-b border-gray-800 bg-dark-900/95 px-4 py-4 backdrop-blur-sm sm:px-6 z-30 lg:min-h-[5.5rem]">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setMobileMenuOpen(true)}
@@ -214,7 +216,7 @@ const AdminLayout = ({ children, title, subtitle }) => {
         </header>
 
         {/* Page Content */}
-        <div className="p-4 sm:p-6">
+        <div className="hide-scrollbar flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
           {children}
         </div>
       </main>
