@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Copy, Shield, BarChart3, Users } from 'lucide-react';
+import { API_URL, getPublicUploadUrl } from '../lib/api';
+
+type ActiveBanner = {
+  _id: string;
+  title?: string;
+  imageUrl: string;
+  link?: string;
+};
 
 const features = [
   { icon: Copy, text: 'Automatic trade replication' },
@@ -13,6 +21,26 @@ export default function CopyTrading() {
   const navigate = useNavigate();
   const sectionRef = useRef<HTMLElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [topTradersBanner, setTopTradersBanner] = useState<ActiveBanner | null>(null);
+  const [topTradersBannerLoading, setTopTradersBannerLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/banners/active?type=copy_trading_top`);
+        const data = await res.json();
+        if (!cancelled && data.success && Array.isArray(data.banners) && data.banners[0]) {
+          setTopTradersBanner(data.banners[0]);
+        }
+      } catch {
+        /* fallback to static card */
+      } finally {
+        if (!cancelled) setTopTradersBannerLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -56,45 +84,80 @@ export default function CopyTrading() {
               transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
-            <div className="rounded-3xl p-8 relative overflow-hidden bg-bluestone-dark/95 shadow-2xl">
-              <div className="space-y-6">
-                <h3 className="text-xl font-bold text-white font-display">Top Traders</h3>
-                {/* Trader Cards */}
-                {[
-                  { name: 'Alex Morgan', roi: '+42.8%', followers: '2,341', winRate: '78%', risk: 'Low' },
-                  { name: 'Sarah Chen', roi: '+38.2%', followers: '1,892', winRate: '82%', risk: 'Medium' },
-                  { name: 'David Kim', roi: '+55.1%', followers: '3,105', winRate: '71%', risk: 'Low' },
-                ].map((trader, index) => (
-                  <div
-                    key={trader.name}
-                    className={`bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all duration-500 ${
-                      isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-                    }`}
-                    style={{ transitionDelay: `${600 + index * 150}ms` }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-bluestone-accent to-gold flex items-center justify-center text-sm font-bold text-white">
-                          {trader.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div>
-                          <div className="text-white font-medium text-sm">{trader.name}</div>
-                          <div className="text-white/50 text-xs">{trader.followers} followers</div>
-                        </div>
-                      </div>
-                      <div className="text-green-400 font-bold font-display">{trader.roi}</div>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs">
-                      <span className="text-white/50">Win Rate: <span className="text-white/80">{trader.winRate}</span></span>
-                      <span className="text-white/50">Risk: <span className="text-white/80">{trader.risk}</span></span>
-                      <button className="ml-auto text-xs bg-bluestone-accent/20 text-bluestone-light px-3 py-1 rounded-full hover:bg-bluestone-accent/30 transition-colors duration-400">
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                ))}
+            {topTradersBannerLoading ? (
+              <div className="rounded-3xl p-8 bg-bluestone-dark/95 shadow-2xl min-h-[320px] flex items-center justify-center">
+                <div className="w-full h-64 rounded-2xl bg-white/5 animate-pulse" aria-hidden />
               </div>
-            </div>
+            ) : topTradersBanner ? (
+              <div className="rounded-3xl overflow-hidden bg-bluestone-dark/95 shadow-2xl border border-white/10">
+                {topTradersBanner.link ? (
+                  <a
+                    href={topTradersBanner.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block hover:ring-2 hover:ring-gold/40 rounded-3xl transition-all"
+                  >
+                    <img
+                      src={getPublicUploadUrl(topTradersBanner.imageUrl)}
+                      alt={topTradersBanner.title || 'Top traders'}
+                      className="w-full h-auto object-cover max-h-[400px] block"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </a>
+                ) : (
+                  <img
+                    src={getPublicUploadUrl(topTradersBanner.imageUrl)}
+                    alt={topTradersBanner.title || 'Top traders'}
+                    className="w-full h-auto object-cover max-h-[400px] block"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+                {topTradersBanner.title ? (
+                  <p className="text-center text-white/70 text-sm py-3 px-4">{topTradersBanner.title}</p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-3xl p-8 relative overflow-hidden bg-bluestone-dark/95 shadow-2xl">
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-white font-display">Top Traders</h3>
+                  {[
+                    { name: 'Alex Morgan', roi: '+42.8%', followers: '2,341', winRate: '78%', risk: 'Low' },
+                    { name: 'Sarah Chen', roi: '+38.2%', followers: '1,892', winRate: '82%', risk: 'Medium' },
+                    { name: 'David Kim', roi: '+55.1%', followers: '3,105', winRate: '71%', risk: 'Low' },
+                  ].map((trader, index) => (
+                    <div
+                      key={trader.name}
+                      className={`bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-all duration-500 ${
+                        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                      }`}
+                      style={{ transitionDelay: `${600 + index * 150}ms` }}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-bluestone-accent to-gold flex items-center justify-center text-sm font-bold text-white">
+                            {trader.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div>
+                            <div className="text-white font-medium text-sm">{trader.name}</div>
+                            <div className="text-white/50 text-xs">{trader.followers} followers</div>
+                          </div>
+                        </div>
+                        <div className="text-green-400 font-bold font-display">{trader.roi}</div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs">
+                        <span className="text-white/50">Win Rate: <span className="text-white/80">{trader.winRate}</span></span>
+                        <span className="text-white/50">Risk: <span className="text-white/80">{trader.risk}</span></span>
+                        <button className="ml-auto text-xs bg-bluestone-accent/20 text-bluestone-light px-3 py-1 rounded-full hover:bg-bluestone-accent/30 transition-colors duration-400">
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Content */}

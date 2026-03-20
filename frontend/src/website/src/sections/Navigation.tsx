@@ -10,7 +10,7 @@ const navLinks = [
   { name: 'Home', href: '#hero' },
   { name: 'Forex', href: '#forex' },
   { name: 'Funding', href: '#funding' },
-  { name: 'IB Program', href: '/ib-program' },
+  { name: 'Introducing Broker', href: '/ib-program' },
   { name: 'Copy Trading', href: '/copy-trading' },
   { name: 'About Us', href: '#about' },
   { name: 'Contact', href: '#contact' },

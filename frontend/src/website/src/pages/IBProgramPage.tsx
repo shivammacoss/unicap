@@ -1,6 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Users, DollarSign, BarChart3, Zap, Shield, Headphones, Link2, LayoutDashboard, Image, FileText, UserCheck, ChevronDown, ChevronUp, TrendingUp, Globe, Award, Briefcase } from 'lucide-react';
 import Footer from '../sections/Footer';
+import { API_URL, getPublicUploadUrl } from '../lib/api';
+
+type ActiveBanner = {
+  _id: string;
+  title?: string;
+  imageUrl: string;
+  link?: string;
+  order?: number;
+};
 
 const benefits = [
   { text: 'Competitive rebate structure', icon: DollarSign },
@@ -56,7 +66,39 @@ const ibTypes = [
 ];
 
 export default function IBProgramPage() {
+  const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [partnerSpotlightBanner, setPartnerSpotlightBanner] = useState<ActiveBanner | null>(null);
+  const [introStatsBanner, setIntroStatsBanner] = useState<ActiveBanner | null>(null);
+  const [ibBannerLoading, setIbBannerLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [partnerRes, introRes] = await Promise.all([
+          fetch(`${API_URL}/banners/active?type=ib`),
+          fetch(`${API_URL}/banners/active?type=ib_intro`),
+        ]);
+        if (cancelled) return;
+        const partnerData = await partnerRes.json();
+        const introData = await introRes.json();
+        if (partnerData.success && Array.isArray(partnerData.banners) && partnerData.banners[0]) {
+          setPartnerSpotlightBanner(partnerData.banners[0]);
+        }
+        if (introData.success && Array.isArray(introData.banners) && introData.banners[0]) {
+          setIntroStatsBanner(introData.banners[0]);
+        }
+      } catch {
+        /* keep fallback UI */
+      } finally {
+        if (!cancelled) setIbBannerLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -111,31 +153,67 @@ export default function IBProgramPage() {
                 You can become a successful IB partner.
               </p>
             </div>
-            <div className="relative">
-              <div className="bg-gradient-to-br from-white/5 to-white/[0.02] rounded-3xl p-8 border border-white/10">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gold/10 rounded-2xl p-6 text-center">
-                    <DollarSign className="w-10 h-10 text-gold mx-auto mb-3" />
-                    <p className="text-2xl font-bold text-white">$10M+</p>
-                    <p className="text-white/60 text-sm">Paid to Partners</p>
-                  </div>
-                  <div className="bg-blue-500/10 rounded-2xl p-6 text-center">
-                    <Users className="w-10 h-10 text-blue-400 mx-auto mb-3" />
-                    <p className="text-2xl font-bold text-white">5,000+</p>
-                    <p className="text-white/60 text-sm">Active IBs</p>
-                  </div>
-                  <div className="bg-purple-500/10 rounded-2xl p-6 text-center">
-                    <Globe className="w-10 h-10 text-purple-400 mx-auto mb-3" />
-                    <p className="text-2xl font-bold text-white">50+</p>
-                    <p className="text-white/60 text-sm">Countries</p>
-                  </div>
-                  <div className="bg-emerald-500/10 rounded-2xl p-6 text-center">
-                    <TrendingUp className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-                    <p className="text-2xl font-bold text-white">90%</p>
-                    <p className="text-white/60 text-sm">Partner Retention</p>
+            <div className="relative min-h-[280px]">
+              {ibBannerLoading ? (
+                <div className="bg-gradient-to-br from-white/5 to-white/[0.02] rounded-3xl p-8 border border-white/10 h-64 flex items-center justify-center">
+                  <div className="w-full h-48 rounded-2xl bg-white/5 animate-pulse" aria-hidden />
+                </div>
+              ) : introStatsBanner ? (
+                <div className="bg-gradient-to-br from-white/5 to-white/[0.02] rounded-3xl overflow-hidden border border-white/10">
+                  {introStatsBanner.link ? (
+                    <a
+                      href={introStatsBanner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-2xl overflow-hidden"
+                    >
+                      <img
+                        src={getPublicUploadUrl(introStatsBanner.imageUrl)}
+                        alt={introStatsBanner.title || 'Introducing Broker'}
+                        className="w-full h-auto object-cover max-h-[320px] block"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </a>
+                  ) : (
+                    <img
+                      src={getPublicUploadUrl(introStatsBanner.imageUrl)}
+                      alt={introStatsBanner.title || 'Introducing Broker'}
+                      className="w-full h-auto object-cover max-h-[320px] block rounded-2xl"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                  {introStatsBanner.title ? (
+                    <p className="text-center text-white/70 text-sm py-3 px-4">{introStatsBanner.title}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="bg-gradient-to-br from-white/5 to-white/[0.02] rounded-3xl p-8 border border-white/10">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gold/10 rounded-2xl p-6 text-center">
+                      <DollarSign className="w-10 h-10 text-gold mx-auto mb-3" />
+                      <p className="text-2xl font-bold text-white">$10M+</p>
+                      <p className="text-white/60 text-sm">Paid to Partners</p>
+                    </div>
+                    <div className="bg-blue-500/10 rounded-2xl p-6 text-center">
+                      <Users className="w-10 h-10 text-blue-400 mx-auto mb-3" />
+                      <p className="text-2xl font-bold text-white">5,000+</p>
+                      <p className="text-white/60 text-sm">Active IBs</p>
+                    </div>
+                    <div className="bg-purple-500/10 rounded-2xl p-6 text-center">
+                      <Globe className="w-10 h-10 text-purple-400 mx-auto mb-3" />
+                      <p className="text-2xl font-bold text-white">50+</p>
+                      <p className="text-white/60 text-sm">Countries</p>
+                    </div>
+                    <div className="bg-emerald-500/10 rounded-2xl p-6 text-center">
+                      <TrendingUp className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+                      <p className="text-2xl font-bold text-white">90%</p>
+                      <p className="text-white/60 text-sm">Partner Retention</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -246,15 +324,55 @@ export default function IBProgramPage() {
                 ))}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-gold/10 to-transparent rounded-3xl p-8 border border-gold/20">
-              <div className="text-center">
-                <Award className="w-16 h-16 text-gold mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-white mb-2">Trusted Partnership</h3>
-                <p className="text-white/60 mb-6">Join thousands of successful partners worldwide</p>
-                <button className="btn-primary px-8 py-3 bg-gradient-to-r from-gold to-amber-500 text-bluestone-dark font-semibold">
-                  Become a Partner
-                </button>
-              </div>
+            <div className="bg-gradient-to-br from-gold/10 to-transparent rounded-3xl p-6 sm:p-8 border border-gold/20 min-h-[280px] flex items-center justify-center">
+              {ibBannerLoading ? (
+                <div className="w-full h-64 rounded-2xl bg-white/5 animate-pulse" aria-hidden />
+              ) : partnerSpotlightBanner ? (
+                <div className="w-full">
+                  {partnerSpotlightBanner.link ? (
+                    <a
+                      href={partnerSpotlightBanner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-2xl overflow-hidden ring-1 ring-white/10 hover:ring-gold/40 transition-all"
+                    >
+                      <img
+                        src={getPublicUploadUrl(partnerSpotlightBanner.imageUrl)}
+                        alt={partnerSpotlightBanner.title || 'IB partner program'}
+                        className="w-full h-auto object-cover max-h-[420px] block"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </a>
+                  ) : (
+                    <div className="rounded-2xl overflow-hidden ring-1 ring-white/10">
+                      <img
+                        src={getPublicUploadUrl(partnerSpotlightBanner.imageUrl)}
+                        alt={partnerSpotlightBanner.title || 'IB partner program'}
+                        className="w-full h-auto object-cover max-h-[420px] block"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  )}
+                  {partnerSpotlightBanner.title ? (
+                    <p className="text-center text-white/70 text-sm mt-4">{partnerSpotlightBanner.title}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-center w-full">
+                  <Award className="w-16 h-16 text-gold mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-2">Trusted Partnership</h3>
+                  <p className="text-white/60 mb-6">Join thousands of successful partners worldwide</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/user/login')}
+                    className="btn-primary px-8 py-3 bg-gradient-to-r from-gold to-amber-500 text-bluestone-dark font-semibold"
+                  >
+                    Become a Partner
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

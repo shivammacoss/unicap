@@ -1,6 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, TrendingUp, BarChart3, Zap, Shield, Clock, Target, ChevronDown, ChevronUp, Settings, DollarSign, Award, LineChart, UserCheck, Copy, Wallet, Sliders, StopCircle, PiggyBank } from 'lucide-react';
 import Footer from '../sections/Footer';
+import { API_URL, getPublicUploadUrl } from '../lib/api';
+
+type ActiveBanner = {
+  _id: string;
+  title?: string;
+  imageUrl: string;
+  link?: string;
+};
 
 const investorBenefits = [
   { text: 'No trading experience needed', icon: UserCheck },
@@ -63,6 +71,49 @@ const faqs = [
 
 export default function CopyTradingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [introBanner, setIntroBanner] = useState<ActiveBanner | null>(null);
+  const [introBannerLoading, setIntroBannerLoading] = useState(true);
+  const [ctaBanner, setCtaBanner] = useState<ActiveBanner | null>(null);
+  const [ctaBannerLoading, setCtaBannerLoading] = useState(true);
+  const [riskBanner, setRiskBanner] = useState<ActiveBanner | null>(null);
+  const [riskBannerLoading, setRiskBannerLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [introRes, ctaRes, riskRes] = await Promise.all([
+          fetch(`${API_URL}/banners/active?type=copy_trading`),
+          fetch(`${API_URL}/banners/active?type=copy_trading_cta`),
+          fetch(`${API_URL}/banners/active?type=copy_trading_risk`),
+        ]);
+        if (cancelled) return;
+        const introData = await introRes.json();
+        const ctaData = await ctaRes.json();
+        const riskData = await riskRes.json();
+        if (introData.success && Array.isArray(introData.banners) && introData.banners[0]) {
+          setIntroBanner(introData.banners[0]);
+        }
+        if (ctaData.success && Array.isArray(ctaData.banners) && ctaData.banners[0]) {
+          setCtaBanner(ctaData.banners[0]);
+        }
+        if (riskData.success && Array.isArray(riskData.banners) && riskData.banners[0]) {
+          setRiskBanner(riskData.banners[0]);
+        }
+      } catch {
+        /* fallback to static */
+      } finally {
+        if (!cancelled) {
+          setIntroBannerLoading(false);
+          setCtaBannerLoading(false);
+          setRiskBannerLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -118,12 +169,46 @@ export default function CopyTradingPage() {
                 ))}
               </div>
             </div>
-            <div className="relative">
-              <img 
-                src="/image/ib_img1.png" 
-                alt="Copy Trading Illustration" 
-                className="w-full h-auto rounded-2xl shadow-2xl"
-              />
+            <div className="relative min-h-[200px]">
+              {introBannerLoading ? (
+                <div className="w-full h-64 rounded-2xl bg-white/5 animate-pulse" aria-hidden />
+              ) : introBanner ? (
+                <div className="rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+                  {introBanner.link ? (
+                    <a
+                      href={introBanner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <img
+                        src={getPublicUploadUrl(introBanner.imageUrl)}
+                        alt={introBanner.title || 'Copy Trading'}
+                        className="w-full h-auto object-cover max-h-[420px] block"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </a>
+                  ) : (
+                    <img
+                      src={getPublicUploadUrl(introBanner.imageUrl)}
+                      alt={introBanner.title || 'Copy Trading'}
+                      className="w-full h-auto object-cover max-h-[420px] block"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                  {introBanner.title ? (
+                    <p className="text-center text-white/60 text-sm py-3 px-2">{introBanner.title}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <img
+                  src="/image/ib_img1.png"
+                  alt="Copy Trading Illustration"
+                  className="w-full h-auto rounded-2xl shadow-2xl"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -203,15 +288,51 @@ export default function CopyTradingPage() {
                 ))}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-gold/10 to-gold-dark/10 rounded-3xl p-8 border border-gold/20">
-              <div className="text-center">
-                <Award className="w-16 h-16 text-gold mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-white mb-2">Become a Top Trader</h3>
-                <p className="text-white/60 mb-6">Join our strategy provider program and monetize your skills</p>
-                <button className="btn-primary px-8 py-3 font-semibold">
-                  Apply Now
-                </button>
-              </div>
+            <div className="bg-gradient-to-br from-gold/10 to-gold-dark/10 rounded-3xl p-6 sm:p-8 border border-gold/20 min-h-[280px] flex items-center justify-center">
+              {ctaBannerLoading ? (
+                <div className="w-full h-64 rounded-2xl bg-white/5 animate-pulse" aria-hidden />
+              ) : ctaBanner ? (
+                <div className="w-full">
+                  {ctaBanner.link ? (
+                    <a
+                      href={ctaBanner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-2xl overflow-hidden ring-1 ring-white/10 hover:ring-gold/40 transition-all"
+                    >
+                      <img
+                        src={getPublicUploadUrl(ctaBanner.imageUrl)}
+                        alt={ctaBanner.title || 'Become a Top Trader'}
+                        className="w-full h-auto object-cover max-h-[380px] block"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </a>
+                  ) : (
+                    <div className="rounded-2xl overflow-hidden ring-1 ring-white/10">
+                      <img
+                        src={getPublicUploadUrl(ctaBanner.imageUrl)}
+                        alt={ctaBanner.title || 'Become a Top Trader'}
+                        className="w-full h-auto object-cover max-h-[380px] block"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  )}
+                  {ctaBanner.title ? (
+                    <p className="text-center text-white/70 text-sm mt-4">{ctaBanner.title}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-center w-full">
+                  <Award className="w-16 h-16 text-gold mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-2">Become a Top Trader</h3>
+                  <p className="text-white/60 mb-6">Join our strategy provider program and monetize your skills</p>
+                  <button className="btn-primary px-8 py-3 font-semibold">
+                    Apply Now
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -267,16 +388,52 @@ export default function CopyTradingPage() {
                 </div>
               </div>
             </div>
-            <div className="order-1 lg:order-2">
-              <h2 className="font-display text-3xl sm:text-4xl font-bold text-white mb-6">
-                Risk Control <span className="text-gold">Features</span>
-              </h2>
-              <p className="text-white/70 mb-6">
-                We provide comprehensive risk management tools to ensure you always stay in control of your investments.
-              </p>
-              <p className="text-gold font-semibold flex items-center gap-2">
-                <Shield className="w-5 h-5" /> You always remain in control.
-              </p>
+            <div className="order-1 lg:order-2 min-h-[200px]">
+              {riskBannerLoading ? (
+                <div className="w-full h-56 rounded-2xl bg-white/5 animate-pulse" aria-hidden />
+              ) : riskBanner ? (
+                <div className="rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+                  {riskBanner.link ? (
+                    <a
+                      href={riskBanner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block hover:ring-2 hover:ring-emerald-500/40 rounded-2xl transition-all"
+                    >
+                      <img
+                        src={getPublicUploadUrl(riskBanner.imageUrl)}
+                        alt={riskBanner.title || 'Risk control features'}
+                        className="w-full h-auto object-cover max-h-[400px] block"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </a>
+                  ) : (
+                    <img
+                      src={getPublicUploadUrl(riskBanner.imageUrl)}
+                      alt={riskBanner.title || 'Risk control features'}
+                      className="w-full h-auto object-cover max-h-[400px] block"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                  {riskBanner.title ? (
+                    <p className="text-center text-white/70 text-sm py-3 px-2">{riskBanner.title}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <h2 className="font-display text-3xl sm:text-4xl font-bold text-white mb-6">
+                    Risk Control <span className="text-gold">Features</span>
+                  </h2>
+                  <p className="text-white/70 mb-6">
+                    We provide comprehensive risk management tools to ensure you always stay in control of your investments.
+                  </p>
+                  <p className="text-gold font-semibold flex items-center gap-2">
+                    <Shield className="w-5 h-5" /> You always remain in control.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

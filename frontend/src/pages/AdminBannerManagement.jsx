@@ -20,6 +20,8 @@ const AdminBannerManagement = () => {
     endDate: ''
   })
   const [imageFile, setImageFile] = useState(null)
+  const [bannerToDelete, setBannerToDelete] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     fetchBanners()
@@ -85,6 +87,7 @@ const AdminBannerManagement = () => {
         fetchBanners()
         setShowModal(false)
         resetForm()
+        toast.success(editingBanner ? 'Banner updated successfully' : 'Banner created successfully')
       } else {
         toast.error(data.message || 'Error saving banner')
       }
@@ -111,21 +114,36 @@ const AdminBannerManagement = () => {
     setShowModal(true)
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this banner?')) return
+  const requestDeleteBanner = (banner) => {
+    setBannerToDelete({ id: banner._id, title: banner.title || 'Untitled banner' })
+  }
 
+  const cancelDeleteBanner = () => {
+    if (!deleteLoading) setBannerToDelete(null)
+  }
+
+  const confirmDeleteBanner = async () => {
+    if (!bannerToDelete) return
+    setDeleteLoading(true)
     try {
       const token = localStorage.getItem('adminToken')
-      const res = await fetch(`${API_URL}/banners/${id}`, {
+      const res = await fetch(`${API_URL}/banners/${bannerToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const data = await res.json()
       if (data.success) {
+        setBannerToDelete(null)
         fetchBanners()
+        toast.success('Banner deleted successfully')
+      } else {
+        toast.error(data.message || 'Error deleting banner')
       }
     } catch (error) {
       console.error('Error deleting banner:', error)
+      toast.error('Error deleting banner')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -251,11 +269,17 @@ const AdminBannerManagement = () => {
                     />
                     <div className="absolute top-2 right-2 flex gap-1">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        banner.bannerType === 'support' ? 'bg-purple-500/20 text-purple-400' : 
+                        banner.bannerType === 'support' ? 'bg-purple-500/20 text-purple-400' :
                         banner.bannerType === 'ib' ? 'bg-orange-500/20 text-orange-400' :
+                        banner.bannerType === 'ib_intro' ? 'bg-amber-500/20 text-amber-400' :
+                        banner.bannerType === 'copy_trading' ? 'bg-teal-500/20 text-teal-400' :
+                        banner.bannerType === 'copy_trading_top' ? 'bg-teal-600/20 text-teal-300' :
+                        banner.bannerType === 'copy_trading_cta' ? 'bg-emerald-500/20 text-emerald-400' :
+                        banner.bannerType === 'copy_trading_risk' ? 'bg-lime-500/20 text-lime-400' :
+                        banner.bannerType === 'funding' ? 'bg-sky-500/20 text-sky-400' :
                         banner.bannerType === 'account' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-blue-500/20 text-blue-400'
                       }`}>
-                        {banner.bannerType === 'support' ? 'Support' : banner.bannerType === 'ib' ? 'IB' : banner.bannerType === 'account' ? 'Account' : 'Hero'}
+                        {banner.bannerType === 'support' ? 'Support' : banner.bannerType === 'ib' ? 'Partner With Us' : banner.bannerType === 'ib_intro' ? 'Introducing Broker Intro' : banner.bannerType === 'copy_trading' ? 'Copy Trading' : banner.bannerType === 'copy_trading_top' ? 'Copy Trading Top' : banner.bannerType === 'copy_trading_cta' ? 'Copy Trading CTA' : banner.bannerType === 'copy_trading_risk' ? 'Copy Trading Risk' : banner.bannerType === 'funding' ? 'Funding' : banner.bannerType === 'account' ? 'Account' : 'Hero'}
                       </span>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         banner.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
@@ -294,7 +318,8 @@ const AdminBannerManagement = () => {
                           <Edit2 size={16} />
                         </button>
                         <button
-                          onClick={() => handleDelete(banner._id)}
+                          type="button"
+                          onClick={() => requestDeleteBanner(banner)}
                           className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
                           title="Delete"
                         >
@@ -308,6 +333,49 @@ const AdminBannerManagement = () => {
             </div>
           )}
         </div>
+
+        {/* Delete confirmation */}
+        {bannerToDelete && (
+          <div
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-banner-title"
+            onClick={cancelDeleteBanner}
+          >
+            <div
+              className="bg-[#1a1a1a] rounded-xl w-full max-w-md border border-gray-800 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-gray-800">
+                <h2 id="delete-banner-title" className="text-xl font-bold text-white">
+                  Delete banner?
+                </h2>
+                <p className="text-gray-400 text-sm mt-2">
+                  This will permanently remove <span className="text-white font-medium">&ldquo;{bannerToDelete.title}&rdquo;</span> from the list. This action cannot be undone.
+                </p>
+              </div>
+              <div className="p-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={cancelDeleteBanner}
+                  disabled={deleteLoading}
+                  className="flex-1 bg-gray-700 text-white py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteBanner}
+                  disabled={deleteLoading}
+                  className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-500 transition-colors disabled:opacity-50"
+                >
+                  {deleteLoading ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add/Edit Modal */}
         {showModal && (
@@ -364,7 +432,13 @@ const AdminBannerManagement = () => {
                   >
                     <option value="hero">Hero (Dashboard)</option>
                     <option value="support">Support (Support Page)</option>
-                    <option value="ib">IB (IB Page)</option>
+                    <option value="ib">Partner With Us</option>
+                    <option value="ib_intro">Introducing Broker Intro</option>
+                    <option value="copy_trading">Copy Trading</option>
+                    <option value="copy_trading_top">Copy Trading Top</option>
+                    <option value="copy_trading_cta">Copy Trading CTA</option>
+                    <option value="copy_trading_risk">Copy Trading Risk</option>
+                    <option value="funding">Funding</option>
                     <option value="account">Account (Account Page)</option>
                   </select>
                 </div>

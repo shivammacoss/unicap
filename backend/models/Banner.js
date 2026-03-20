@@ -24,7 +24,7 @@ const bannerSchema = new mongoose.Schema({
   },
   bannerType: {
     type: String,
-    enum: ['hero', 'support', 'ib', 'account'],
+    enum: ['hero', 'support', 'ib', 'ib_intro', 'copy_trading', 'copy_trading_top', 'copy_trading_cta', 'copy_trading_risk', 'funding', 'account'],
     default: 'hero'
   },
   startDate: {
