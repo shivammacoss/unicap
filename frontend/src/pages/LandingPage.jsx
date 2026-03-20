@@ -303,6 +303,13 @@ const Markets = () => {
           <p className="text-gray-600 max-w-2xl mx-auto">
             Track global market movements in real time with powerful analytics.
           </p>
+          <p
+            id="usd-jpy"
+            className="text-gray-700 text-sm mt-5 max-w-2xl mx-auto scroll-mt-28"
+          >
+            <span className="font-semibold text-gray-900">USDJPY</span> — US Dollar / Japanese Yen is one of the most traded forex pairs;
+            live charting and analysis are available when you trade with us.
+          </p>
         </div>
 
         <div className="flex justify-center mb-8">
@@ -933,6 +940,33 @@ const LandingFooter = () => {
               </ul>
             </div>
           ))}
+        </div>
+
+        <div className="mb-10 rounded-xl border border-gray-700 bg-gray-800/40 p-5 md:p-6">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500 mb-2">
+            Partner disclosure
+          </p>
+          <p className="text-gray-300 text-sm leading-relaxed">
+            UC Markets brings you live forex insights through{' '}
+            <a
+              href="https://www.tradingview.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 underline hover:text-emerald-300"
+            >
+              TradingView
+            </a>
+            {' '}
+            — the global leader in market analysis, allowing you to monitor{' '}
+            <a
+              href="/#usd-jpy"
+              className="text-emerald-400 font-medium underline hover:text-emerald-300"
+            >
+              USDJPY
+            </a>
+            {' '}
+            and other major pairs with advanced live charting and smooth navigation.
+          </p>
         </div>
 
         <div className="border-t border-gray-800 pt-8">
