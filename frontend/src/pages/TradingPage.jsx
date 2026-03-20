@@ -110,6 +110,11 @@ const TradingPage = () => {
   const [killSwitchTimeLeft, setKillSwitchTimeLeft] = useState('')
   const [globalNotification, setGlobalNotification] = useState('')
 
+  const selectedInstrumentRef = useRef(selectedInstrument)
+  useEffect(() => {
+    selectedInstrumentRef.current = selectedInstrument
+  }, [selectedInstrument])
+
   const categories = ['All', 'Starred', 'Forex', 'Metals', 'Commodities', 'Crypto']
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -177,14 +182,11 @@ const TradingPage = () => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Real-time price updates via WebSocket for institutional-grade streaming
+  // Real-time price updates via WebSocket — mount once so changing symbol does not tear down Socket.IO
   useEffect(() => {
-    // Subscribe to WebSocket price stream
     const unsubscribe = priceStreamService.subscribe('tradingPage', (prices, updated, timestamp) => {
-      // Only update if we have valid prices (prevent flickering to zero)
       if (!prices || Object.keys(prices).length === 0) return
-      
-      // Merge prices to prevent losing existing data
+
       setLivePrices(prev => {
         const merged = { ...prev }
         Object.entries(prices).forEach(([symbol, price]) => {
@@ -194,8 +196,7 @@ const TradingPage = () => {
         })
         return merged
       })
-      
-      // Update instruments with live prices (only if price is valid)
+
       setInstruments(prev => prev.map(inst => {
         const priceData = prices[inst.symbol]
         if (priceData && priceData.bid && priceData.bid > 0) {
@@ -206,24 +207,26 @@ const TradingPage = () => {
         }
         return inst
       }))
-      
-      // Update selected instrument (only if price is valid)
-      const selectedPrice = prices[selectedInstrument?.symbol]
+
+      const sel = selectedInstrumentRef.current
+      const selectedPrice = sel?.symbol ? prices[sel.symbol] : null
       if (selectedPrice && selectedPrice.bid && selectedPrice.bid > 0) {
-        setSelectedInstrument(prev => ({
-          ...prev,
-          bid: selectedPrice.bid,
-          ask: selectedPrice.ask || selectedPrice.bid,
-          spread: Math.abs((selectedPrice.ask || selectedPrice.bid) - selectedPrice.bid)
-        }))
+        setSelectedInstrument(prev => {
+          if (prev.symbol !== sel.symbol) return prev
+          return {
+            ...prev,
+            bid: selectedPrice.bid,
+            ask: selectedPrice.ask || selectedPrice.bid,
+            spread: Math.abs((selectedPrice.ask || selectedPrice.bid) - selectedPrice.bid)
+          }
+        })
       }
     })
-    
-    // Fallback: also fetch via HTTP for initial load
+
     fetchLivePrices()
-    
+
     return () => unsubscribe()
-  }, [selectedInstrument?.symbol])
+  }, [])
 
   // Kill Switch - Check localStorage on load and update timer
   useEffect(() => {

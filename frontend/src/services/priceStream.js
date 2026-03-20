@@ -1,8 +1,8 @@
 // Institutional-grade real-time price streaming service using Socket.IO
 import { io } from 'socket.io-client'
-import { API_BASE_URL } from '../config/api'
+import { SOCKET_IO_URL } from '../config/api'
 
-const SOCKET_URL = API_BASE_URL
+const SOCKET_URL = SOCKET_IO_URL
 
 class PriceStreamService {
   constructor() {

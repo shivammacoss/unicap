@@ -185,7 +185,25 @@ app.set('io', io)
 
 // Middleware
 app.use(compression())
-app.use(cors())
+const corsOriginOption = (() => {
+  const raw = process.env.CORS_ORIGIN
+  if (!raw || !String(raw).trim()) return true
+  const list = String(raw)
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+  if (list.length === 0) return true
+  if (list.length === 1) return list[0]
+  return list
+})()
+app.use(
+  cors({
+    origin: corsOriginOption,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+)
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
@@ -253,7 +271,7 @@ app.get('/', (req, res) => {
   res.json({ message: 'unicap API is running' })
 })
 
-const PORT = process.env.PORT || 5000
+const PORT = process.env.PORT || 5001
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
   
