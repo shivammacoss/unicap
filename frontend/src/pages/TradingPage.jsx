@@ -1215,14 +1215,14 @@ const TradingPage = () => {
 
   if (loading) {
     return (
-      <div className={`h-screen flex items-center justify-center ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
+      <div className={`flex-1 min-h-0 w-full flex items-center justify-center ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
         <div className={isDarkMode ? 'text-white' : 'text-gray-900'}>Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className={`h-screen flex overflow-hidden text-sm transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
+    <div className={`flex-1 min-h-0 w-full flex overflow-hidden text-sm transition-colors duration-300 ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
       {/* Left Sidebar */}
       <div className={`w-12 border-r flex flex-col items-center py-3 shrink-0 ${isDarkMode ? 'bg-[#0a0a0a] border-gray-800' : 'bg-white border-gray-200'}`}>
         <button 

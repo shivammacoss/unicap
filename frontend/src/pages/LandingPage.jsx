@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { LANDING_PATH_TO_SECTION } from '../constants/landingSectionRoutes'
 import { Menu, X, Download, BarChart3, Zap, TrendingUp, TrendingDown, Coins, ArrowRight, Shield, Lock, Eye, Smartphone, Wallet, Database, Sliders, Target, Award, Check, HelpCircle, MessageCircle, Headphones, MessageSquare, ArrowRight as ArrowRightIcon, BookOpen, Facebook, Twitter, Linkedin, Youtube, Instagram } from 'lucide-react'
 
 // ==================== HEADER ====================
@@ -8,12 +9,12 @@ const Header = () => {
   const navigate = useNavigate()
 
   const navItems = [
-    { title: 'Home', href: '#' },
-    { title: 'Markets', href: '#markets' },
-    { title: 'Trade Solutions', href: '#products' },
-    { title: 'Funding Program', href: '#funding' },
-    { title: 'Company', href: '#about' },
-    { title: 'Support', href: '#support' }
+    { title: 'Home', to: '/' },
+    { title: 'Markets', to: '/markets' },
+    { title: 'Trade Solutions', to: '/products' },
+    { title: 'Funding Program', to: '/funding' },
+    { title: 'Company', to: '/about' },
+    { title: 'Support', to: '/support' }
   ]
 
   return (
@@ -21,24 +22,24 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           <div className="flex items-center">
-            <a href="/" className="flex items-center">
+            <Link to="/" className="flex items-center">
               <img 
                 src="/image/unicap logo light.png" 
                 alt="UNICAP MARKETS" 
                 className="h-10 md:h-12 w-auto"
               />
-            </a>
+            </Link>
           </div>
 
           <nav className="hidden lg:flex items-center space-x-6">
             {navItems.map((item, index) => (
-              <a
+              <Link
                 key={index}
-                href={item.href}
+                to={item.to}
                 className="text-gray-300 hover:text-white transition-colors font-medium text-sm"
               >
                 {item.title}
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -66,14 +67,14 @@ const Header = () => {
         {isMenuOpen && (
           <div className="lg:hidden py-4 border-t border-gray-800">
             {navItems.map((item, index) => (
-              <a
+              <Link
                 key={index}
-                href={item.href}
+                to={item.to}
                 className="block py-3 text-gray-300 hover:text-white transition-colors font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {item.title}
-              </a>
+              </Link>
             ))}
             <div className="pt-4 border-t border-gray-800 mt-4 space-y-3">
               <a href="/unicap.apk" download className="flex items-center space-x-2 text-gray-300 hover:text-emerald-400 py-2">
@@ -861,13 +862,13 @@ const CTA = () => {
             Create Account
             <ArrowRight className="ml-2 w-5 h-5" />
           </button>
-          <a 
-            href="#support" 
+          <Link
+            to="/support"
             className="border-2 border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white/10 transition-all inline-flex items-center justify-center"
           >
             <MessageSquare className="mr-2 w-5 h-5" />
             Contact Sales
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -887,7 +888,7 @@ const LandingFooter = () => {
   const footerLinks = {
     Products: ['Markets', 'Futures', 'Earn'],
     Company: ['About', 'Blog', 'Partners', 'Careers'],
-    Legal: ['Terms', 'Privacy', 'Risk Disclosure', 'Compliance']
+    Legal: ['Terms', 'Privacy', 'Risk Disclosure', 'Compliance', 'USDJPY']
   }
 
   const socialLinks = [
@@ -932,9 +933,48 @@ const LandingFooter = () => {
               <ul className="space-y-2">
                 {links.map((link, i) => (
                   <li key={i}>
-                    <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
-                      {link}
-                    </a>
+                    {link === 'Terms' ? (
+                      <Link
+                        to="/terms"
+                        className="text-gray-400 hover:text-white transition-colors text-sm"
+                      >
+                        {link}
+                      </Link>
+                    ) : link === 'Privacy' ? (
+                      <Link
+                        to="/privacy"
+                        className="text-gray-400 hover:text-white transition-colors text-sm"
+                      >
+                        {link}
+                      </Link>
+                    ) : link === 'Risk Disclosure' ? (
+                      <Link
+                        to="/risk-disclosure"
+                        className="text-gray-400 hover:text-white transition-colors text-sm"
+                      >
+                        {link}
+                      </Link>
+                    ) : link === 'Compliance' ? (
+                      <Link
+                        to="/compliance"
+                        className="text-gray-400 hover:text-white transition-colors text-sm"
+                      >
+                        {link}
+                      </Link>
+                    ) : link === 'USDJPY' ? (
+                      <a
+                        href="https://www.tradingview.com/symbols/USDJPY/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-white transition-colors text-sm"
+                      >
+                        {link}
+                      </a>
+                    ) : (
+                      <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">
+                        {link}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -959,7 +999,9 @@ const LandingFooter = () => {
             {' '}
             — the global leader in market analysis, allowing you to monitor{' '}
             <a
-              href="/#usd-jpy"
+              href="https://www.tradingview.com/symbols/USDJPY/"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-emerald-400 font-medium underline hover:text-emerald-300"
             >
               USDJPY
@@ -968,20 +1010,6 @@ const LandingFooter = () => {
             and other major pairs with advanced live charting and smooth navigation.
           </p>
         </div>
-
-        <div className="border-t border-gray-800 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-500 text-sm mb-4 md:mb-0">
-              &copy; 2026 UNICAP MARKET. All Rights Reserved.
-            </p>
-            <div className="flex flex-wrap justify-center gap-6">
-              <a href="#" className="text-gray-500 hover:text-white text-sm transition-colors">Terms</a>
-              <a href="#" className="text-gray-500 hover:text-white text-sm transition-colors">Privacy</a>
-              <a href="#" className="text-gray-500 hover:text-white text-sm transition-colors">Risk Disclosure</a>
-              <a href="#" className="text-gray-500 hover:text-white text-sm transition-colors">Compliance</a>
-            </div>
-          </div>
-        </div>
       </div>
     </footer>
   )
@@ -989,6 +1017,22 @@ const LandingFooter = () => {
 
 // ==================== MAIN LANDING PAGE ====================
 const LandingPage = () => {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    const sectionId = LANDING_PATH_TO_SECTION[pathname]
+    if (!sectionId) return
+    const id = window.setTimeout(() => {
+      const el = document.getElementById(sectionId)
+      if (el) {
+        const headerOffset = 88
+        const top = el.getBoundingClientRect().top + window.scrollY - headerOffset
+        window.scrollTo({ top, behavior: 'smooth' })
+      }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [pathname])
+
   return (
     <div className="min-h-screen bg-white">
       <Header />

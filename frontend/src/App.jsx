@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import AppLayout from './components/AppLayout'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
@@ -44,58 +45,73 @@ import AdminBannerManagement from './pages/AdminBannerManagement'
 import LandingPage from './pages/LandingPage'
 import EmployeeLogin from './pages/EmployeeLogin'
 import AdminProfile from './pages/AdminProfile'
+import RiskDisclosure from './pages/RiskDisclosure'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
+import Compliance from './pages/Compliance'
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Navigate to="/user/login" replace />} />
-        <Route path="/signup" element={<Navigate to="/user/signup" replace />} />
-        <Route path="/user/signup" element={<Signup />} />
-        <Route path="/user/login" element={<Login />} />
-        <Route path="/user/forgot-password" element={<ForgotPassword />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/mobile" element={<MobileTradingApp />} />
-        <Route path="/account" element={<Account />} />
-        <Route path="/wallet" element={<WalletPage />} />
-        <Route path="/orders" element={<OrderBook />} />
-        <Route path="/trade/:accountId" element={<TradingPage />} />
-        <Route path="/copytrade" element={<CopyTradePage />} />
-        <Route path="/ib" element={<IBPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/support" element={<SupportPage />} />
-        <Route path="/instructions" element={<InstructionsPage />} />
-        <Route path="/admin" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={<AdminOverview />} />
-        <Route path="/admin/users" element={<AdminUserManagement />} />
-        <Route path="/admin/accounts" element={<AdminAccounts />} />
-        <Route path="/admin/account-types" element={<AdminAccountTypes />} />
-        <Route path="/admin/transactions" element={<AdminTransactions />} />
-        <Route path="/admin/payment-methods" element={<AdminPaymentMethods />} />
-        <Route path="/admin/trades" element={<AdminTradeManagement />} />
-        <Route path="/admin/funds" element={<AdminFundManagement />} />
-        <Route path="/admin/bank-settings" element={<AdminBankSettings />} />
-        <Route path="/admin/ib-management" element={<AdminIBManagement />} />
-        <Route path="/admin/forex-charges" element={<AdminForexCharges />} />
-        <Route path="/admin/indian-charges" element={<AdminIndianCharges />} />
-        <Route path="/admin/copy-trade" element={<AdminCopyTrade />} />
-        <Route path="/admin/prop-firm" element={<AdminPropFirm />} />
-        <Route path="/admin/admin-management" element={<AdminManagement />} />
-        <Route path="/admin/kyc" element={<AdminKYC />} />
-        <Route path="/admin/support" element={<AdminSupport />} />
-        <Route path="/admin/prop-trading" element={<AdminPropTrading />} />
-        <Route path="/admin/earnings" element={<AdminEarnings />} />
-        <Route path="/admin/theme" element={<AdminThemeSettings />} />
-        <Route path="/admin/email-templates" element={<AdminEmailTemplates />} />
-        <Route path="/admin/bonus-management" element={<AdminBonusManagement />} />
-        <Route path="/admin/banners" element={<AdminBannerManagement />} />
-        <Route path="/admin/profile" element={<AdminProfile />} />
-        <Route path="/admin-employee" element={<EmployeeLogin />} />
-        <Route path="/buy-challenge" element={<BuyChallengePage />} />
-        <Route path="/challenge-dashboard" element={<ChallengeDashboardPage />} />
-        <Route path="/:slug/login" element={<BrandedLogin />} />
-        <Route path="/:slug/signup" element={<BrandedSignup />} />
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/markets" element={<LandingPage />} />
+          <Route path="/products" element={<LandingPage />} />
+          <Route path="/funding" element={<LandingPage />} />
+          <Route path="/about" element={<LandingPage />} />
+          <Route path="/support" element={<LandingPage />} />
+          <Route path="/login" element={<Navigate to="/user/login" replace />} />
+          <Route path="/signup" element={<Navigate to="/user/signup" replace />} />
+          <Route path="/user/signup" element={<Signup />} />
+          <Route path="/user/login" element={<Login />} />
+          <Route path="/user/forgot-password" element={<ForgotPassword />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/mobile" element={<MobileTradingApp />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/wallet" element={<WalletPage />} />
+          <Route path="/orders" element={<OrderBook />} />
+          <Route path="/trade/:accountId" element={<TradingPage />} />
+          <Route path="/copytrade" element={<CopyTradePage />} />
+          <Route path="/ib" element={<IBPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/support" element={<SupportPage />} />
+          <Route path="/instructions" element={<InstructionsPage />} />
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminOverview />} />
+          <Route path="/admin/users" element={<AdminUserManagement />} />
+          <Route path="/admin/accounts" element={<AdminAccounts />} />
+          <Route path="/admin/account-types" element={<AdminAccountTypes />} />
+          <Route path="/admin/transactions" element={<AdminTransactions />} />
+          <Route path="/admin/payment-methods" element={<AdminPaymentMethods />} />
+          <Route path="/admin/trades" element={<AdminTradeManagement />} />
+          <Route path="/admin/funds" element={<AdminFundManagement />} />
+          <Route path="/admin/bank-settings" element={<AdminBankSettings />} />
+          <Route path="/admin/ib-management" element={<AdminIBManagement />} />
+          <Route path="/admin/forex-charges" element={<AdminForexCharges />} />
+          <Route path="/admin/indian-charges" element={<AdminIndianCharges />} />
+          <Route path="/admin/copy-trade" element={<AdminCopyTrade />} />
+          <Route path="/admin/prop-firm" element={<AdminPropFirm />} />
+          <Route path="/admin/admin-management" element={<AdminManagement />} />
+          <Route path="/admin/kyc" element={<AdminKYC />} />
+          <Route path="/admin/support" element={<AdminSupport />} />
+          <Route path="/admin/prop-trading" element={<AdminPropTrading />} />
+          <Route path="/admin/earnings" element={<AdminEarnings />} />
+          <Route path="/admin/theme" element={<AdminThemeSettings />} />
+          <Route path="/admin/email-templates" element={<AdminEmailTemplates />} />
+          <Route path="/admin/bonus-management" element={<AdminBonusManagement />} />
+          <Route path="/admin/banners" element={<AdminBannerManagement />} />
+          <Route path="/admin/profile" element={<AdminProfile />} />
+          <Route path="/admin-employee" element={<EmployeeLogin />} />
+          <Route path="/buy-challenge" element={<BuyChallengePage />} />
+          <Route path="/challenge-dashboard" element={<ChallengeDashboardPage />} />
+          <Route path="/risk-disclosure" element={<RiskDisclosure />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/compliance" element={<Compliance />} />
+          <Route path="/:slug/login" element={<BrandedLogin />} />
+          <Route path="/:slug/signup" element={<BrandedSignup />} />
+        </Route>
       </Routes>
     </Router>
   )
