@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Target, TrendingDown, BarChart3, Clock, Calendar, RotateCcw, Award } from 'lucide-react';
 
 type ChallengeType = '2-step' | '1-step';
-type Currency = 'USD' | 'GBP' | 'EUR';
 
 interface AccountPlan {
   accountSize: number;
@@ -22,18 +21,18 @@ interface AccountPlan {
 
 const accountPlans: Record<ChallengeType, AccountPlan[]> = {
   '2-step': [
-    { accountSize: 200000, phase1Target: 20000, phase2Target: 10000, maxDailyLoss: 10000, maxLoss: 20000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 1080 },
     { accountSize: 100000, phase1Target: 10000, phase2Target: 5000, maxDailyLoss: 5000, maxLoss: 10000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 439, originalPrice: 540, isBestValue: true },
     { accountSize: 50000, phase1Target: 5000, phase2Target: 2500, maxDailyLoss: 2500, maxLoss: 5000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 345 },
     { accountSize: 25000, phase1Target: 2500, phase2Target: 1250, maxDailyLoss: 1250, maxLoss: 2500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 250 },
     { accountSize: 10000, phase1Target: 1000, phase2Target: 500, maxDailyLoss: 500, maxLoss: 1000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 89 },
+    { accountSize: 5000, phase1Target: 500, phase2Target: 250, maxDailyLoss: 250, maxLoss: 500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 45 },
   ],
   '1-step': [
-    { accountSize: 200000, phase1Target: 10000, phase2Target: 0, maxDailyLoss: 6000, maxLoss: 12000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 1250 },
     { accountSize: 100000, phase1Target: 5000, phase2Target: 0, maxDailyLoss: 3000, maxLoss: 6000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 599, isBestValue: true },
     { accountSize: 50000, phase1Target: 2500, phase2Target: 0, maxDailyLoss: 1500, maxLoss: 3000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 399 },
     { accountSize: 25000, phase1Target: 1250, phase2Target: 0, maxDailyLoss: 750, maxLoss: 1500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 299 },
     { accountSize: 10000, phase1Target: 500, phase2Target: 0, maxDailyLoss: 300, maxLoss: 600, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 129 },
+    { accountSize: 5000, phase1Target: 250, phase2Target: 0, maxDailyLoss: 150, maxLoss: 300, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 65 },
   ],
 };
 
@@ -47,20 +46,12 @@ const specLabels = [
   { key: 'rewards', label: 'Rewards', icon: Award },
 ];
 
-const currencySymbols: Record<Currency, string> = {
-  USD: '$',
-  GBP: '£',
-  EUR: '€',
-};
-
 export default function FundingTable() {
   const navigate = useNavigate();
   const [challengeType, setChallengeType] = useState<ChallengeType>('2-step');
-  const [currency, setCurrency] = useState<Currency>('EUR');
-  const [showPhases, setShowPhases] = useState(true);
 
   const plans = accountPlans[challengeType];
-  const symbol = currencySymbols[currency];
+  const priceSymbol = '$';
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
@@ -116,37 +107,10 @@ export default function FundingTable() {
           </div>
         </div>
 
-        {/* Currency & Options Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-2">
-            {(['USD', 'GBP', 'EUR'] as Currency[]).map((curr) => (
-              <button
-                key={curr}
-                onClick={() => setCurrency(curr)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                  currency === curr
-                    ? 'bg-white/10 text-white border border-white/20'
-                    : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                {curr === 'USD' && '🇺🇸'}
-                {curr === 'GBP' && '🇬🇧'}
-                {curr === 'EUR' && '🇪🇺'}
-                {curr}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <div className={`w-10 h-5 rounded-full transition-colors duration-300 ${showPhases ? 'bg-blue-500' : 'bg-white/20'} relative`}>
-                <div 
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-300 ${showPhases ? 'translate-x-5' : 'translate-x-0.5'}`}
-                  onClick={() => setShowPhases(!showPhases)}
-                />
-              </div>
-              <span className="text-white/70 text-sm">Show Numbers</span>
-            </label>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 mb-8">
+          <span className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20">
+            🇺🇸 USD
+          </span>
         </div>
 
         {/* Pricing Cards */}
@@ -201,7 +165,7 @@ export default function FundingTable() {
                 {/* Profit Target */}
                 <div className="py-3 border-b border-white/5 text-center">
                   <div className="lg:hidden text-white/40 text-xs mb-1">Profit Target</div>
-                  {showPhases && challengeType === '2-step' ? (
+                  {challengeType === '2-step' ? (
                     <div className="text-sm">
                       <span className="text-white/50">PHASE 1</span>{' '}
                       <span className="text-white">${formatNumber(plan.phase1Target)}</span>
@@ -259,11 +223,11 @@ export default function FundingTable() {
                 <div className="flex items-center justify-center gap-2 mb-4">
                   {plan.originalPrice && (
                     <span className="text-white/40 line-through text-sm">
-                      {symbol}{plan.originalPrice}
+                      {priceSymbol}{plan.originalPrice}
                     </span>
                   )}
                   <span className={`text-2xl font-bold ${plan.isBestValue ? 'text-amber-400' : 'text-white'}`}>
-                    {symbol}{plan.price}
+                    {priceSymbol}{plan.price}
                   </span>
                 </div>
                 <button 
