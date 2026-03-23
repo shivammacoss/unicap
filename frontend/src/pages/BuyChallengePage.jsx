@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { 
   Trophy, Target, TrendingUp, Shield, Clock, AlertTriangle,
   Check, ChevronRight, Zap, Award, DollarSign, ArrowLeft, FileText, X
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 
 export default function BuyChallengePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [challenges, setChallenges] = useState([])
   const [loading, setLoading] = useState(true)
   const [enabled, setEnabled] = useState(false)
@@ -29,6 +30,22 @@ export default function BuyChallengePage() {
     fetchChallenges()
     fetchSettings()
   }, [])
+
+  useEffect(() => {
+    if (!challenges.length) return
+    const params = new URLSearchParams(location.search)
+    const stepsRaw = params.get('steps')
+    const sizeRaw = params.get('size')
+    if (stepsRaw == null || sizeRaw == null) return
+    const steps = parseInt(stepsRaw, 10)
+    const size = parseInt(sizeRaw, 10)
+    if (Number.isNaN(steps) || Number.isNaN(size)) return
+    const match = challenges.some((c) => c.stepsCount === steps && c.fundSize === size)
+    if (match) {
+      setSelectedType(steps)
+      setSelectedSize(size)
+    }
+  }, [challenges, location.search])
 
   const fetchChallenges = async () => {
     try {

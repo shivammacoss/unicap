@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Target, TrendingDown, BarChart3, Clock, Calendar, RotateCcw, Award } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { addToFundingCart } from '../../../lib/fundingCart';
 import Footer from '../sections/Footer';
 
 type ChallengeType = '2-step' | '1-step';
 
 interface AccountPlan {
+  planName: string;
   accountSize: number;
   phase1Target: number;
   phase2Target: number;
@@ -19,20 +22,21 @@ interface AccountPlan {
   isBestValue?: boolean;
 }
 
+/** Prices aligned with product sheet: 1-Step / 2-Step per account size */
 const accountPlans: Record<ChallengeType, AccountPlan[]> = {
   '2-step': [
-    { accountSize: 100000, phase1Target: 10000, phase2Target: 5000, maxDailyLoss: 5000, maxLoss: 10000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 439, originalPrice: 540, isBestValue: true },
-    { accountSize: 50000, phase1Target: 5000, phase2Target: 2500, maxDailyLoss: 2500, maxLoss: 5000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 345 },
-    { accountSize: 25000, phase1Target: 2500, phase2Target: 1250, maxDailyLoss: 1250, maxLoss: 2500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 250 },
-    { accountSize: 10000, phase1Target: 1000, phase2Target: 500, maxDailyLoss: 500, maxLoss: 1000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 89 },
-    { accountSize: 5000, phase1Target: 500, phase2Target: 250, maxDailyLoss: 250, maxLoss: 500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 45 },
+    { planName: 'Prime Funded', accountSize: 100000, phase1Target: 10000, phase2Target: 5000, maxDailyLoss: 5000, maxLoss: 10000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 599, isBestValue: true },
+    { planName: 'Elite Fund', accountSize: 50000, phase1Target: 5000, phase2Target: 2500, maxDailyLoss: 2500, maxLoss: 5000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 400 },
+    { planName: 'Pro Fund', accountSize: 25000, phase1Target: 2500, phase2Target: 1250, maxDailyLoss: 1250, maxLoss: 2500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 225 },
+    { planName: 'Growth Fund 10K', accountSize: 10000, phase1Target: 1000, phase2Target: 500, maxDailyLoss: 500, maxLoss: 1000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 90 },
+    { planName: 'Starter Pro 5K', accountSize: 5000, phase1Target: 500, phase2Target: 250, maxDailyLoss: 250, maxLoss: 500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 55 },
   ],
   '1-step': [
-    { accountSize: 100000, phase1Target: 5000, phase2Target: 0, maxDailyLoss: 3000, maxLoss: 6000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 599, isBestValue: true },
-    { accountSize: 50000, phase1Target: 2500, phase2Target: 0, maxDailyLoss: 1500, maxLoss: 3000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 399 },
-    { accountSize: 25000, phase1Target: 1250, phase2Target: 0, maxDailyLoss: 750, maxLoss: 1500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 299 },
-    { accountSize: 10000, phase1Target: 500, phase2Target: 0, maxDailyLoss: 300, maxLoss: 600, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 129 },
-    { accountSize: 5000, phase1Target: 250, phase2Target: 0, maxDailyLoss: 150, maxLoss: 300, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 65 },
+    { planName: 'Prime Funded', accountSize: 100000, phase1Target: 5000, phase2Target: 0, maxDailyLoss: 3000, maxLoss: 6000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 499, isBestValue: true },
+    { planName: 'Elite Fund', accountSize: 50000, phase1Target: 2500, phase2Target: 0, maxDailyLoss: 1500, maxLoss: 3000, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 340 },
+    { planName: 'Pro Fund', accountSize: 25000, phase1Target: 1250, phase2Target: 0, maxDailyLoss: 750, maxLoss: 1500, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 199 },
+    { planName: 'Growth Fund 10K', accountSize: 10000, phase1Target: 500, phase2Target: 0, maxDailyLoss: 300, maxLoss: 600, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 72 },
+    { planName: 'Starter Pro 5K', accountSize: 5000, phase1Target: 250, phase2Target: 0, maxDailyLoss: 150, maxLoss: 300, minTradingDays: 4, tradingPeriod: 'Unlimited', refund: true, rewards: 'up to 90%', price: 39 },
   ],
 };
 
@@ -54,6 +58,17 @@ export default function FundingsPage() {
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
+  };
+
+  const handleAddToCart = (plan: AccountPlan) => {
+    const stepLabel = challengeType === '1-step' ? '1-Step' : '2-Step';
+    addToFundingCart({
+      challengeType: challengeType,
+      accountSize: plan.accountSize,
+      price: plan.price,
+      label: `${plan.planName} · $${formatNumber(plan.accountSize)} · ${stepLabel}`
+    });
+    toast.success('Added to cart', { duration: 2500 });
   };
 
   return (
@@ -110,15 +125,6 @@ export default function FundingsPage() {
       {/* Pricing Table Section */}
       <section className="py-12 bg-bluestone-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-2 mb-8">
-            <span className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20">
-              🇺🇸 USD
-            </span>
-            <button type="button" className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-white/50 hover:text-white/80 transition-colors">
-              <span className="text-lg">⊞</span> More
-            </button>
-          </div>
-
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {/* Specs Column */}
@@ -163,6 +169,7 @@ export default function FundingsPage() {
                 {/* Account Size Header */}
                 <div className="text-center mb-6 pt-2">
                   <div className="text-white/50 text-xs uppercase tracking-wider mb-1">Account</div>
+                  <div className="text-sm font-medium text-cyan-300/90 mb-1">{plan.planName}</div>
                   <div className="text-3xl font-bold text-white">${formatNumber(plan.accountSize)}</div>
                 </div>
 
@@ -236,12 +243,15 @@ export default function FundingsPage() {
                       {priceSymbol}{plan.price}
                     </span>
                   </div>
-                  <button className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 ${
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart(plan)}
+                    className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 ${
                     plan.isBestValue
                       ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/30'
                       : 'bg-blue-500 text-white hover:bg-blue-600'
                   }`}>
-                    Start now
+                    Add to cart
                   </button>
                 </div>
               </div>

@@ -60,6 +60,7 @@ import ExclusivePlanPage from './website/src/pages/funding/ExclusivePlanPage'
 import IBProgramPage from './website/src/pages/IBProgramPage'
 import CopyTradingPage from './website/src/pages/CopyTradingPage'
 import FundingsPage from './website/src/pages/FundingsPage'
+import FundingCartPage from './pages/FundingCartPage'
 import PDFViewerPage from './pages/PDFViewerPage'
 import WebsiteLayout from './components/WebsiteLayout'
 
@@ -129,6 +130,7 @@ function App() {
         <Route path="/ib-program" element={<WebsiteLayout><IBProgramPage /></WebsiteLayout>} />
         <Route path="/copy-trading" element={<WebsiteLayout><CopyTradingPage /></WebsiteLayout>} />
         <Route path="/fundings" element={<WebsiteLayout><FundingsPage /></WebsiteLayout>} />
+        <Route path="/cart" element={<WebsiteLayout><FundingCartPage /></WebsiteLayout>} />
         <Route path="/legal/:docType" element={<PDFViewerPage />} />
         <Route path="/:slug/login" element={<BrandedLogin />} />
         <Route path="/:slug/signup" element={<BrandedSignup />} />

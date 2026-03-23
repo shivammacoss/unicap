@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { X, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { login } from '../api/auth'
 import logo from '../assets/logo.png'
@@ -17,6 +17,8 @@ const loginSchema = Yup.object().shape({
 
 const Login = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirectAfterLogin = searchParams.get('redirect')
   const [activeTab, setActiveTab] = useState('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -60,8 +62,15 @@ const Login = () => {
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
       toast.success('Login successful! Welcome back.')
-      // Redirect to mobile view on mobile devices
-      if (isMobile) {
+      const safeRedirect =
+        redirectAfterLogin &&
+        redirectAfterLogin.startsWith('/') &&
+        !redirectAfterLogin.startsWith('//')
+          ? redirectAfterLogin
+          : null
+      if (safeRedirect) {
+        navigate(safeRedirect)
+      } else if (isMobile) {
         navigate('/mobile')
       } else {
         navigate('/dashboard')
