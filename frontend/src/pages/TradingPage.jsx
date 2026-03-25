@@ -140,13 +140,12 @@ const TradingPage = () => {
   }
 
   useEffect(() => {
-    fetchAccount()
-    // Fetch all instruments from API
-    fetchInstruments()
-    // Fetch admin-set spreads FIRST, then fetch live prices
+    // Fetch spreads immediately (default/segment level), will re-fetch with accountTypeId after account loads
     fetchAdminSpreads().then(() => {
       fetchLivePrices()
     })
+    fetchAccount()
+    fetchInstruments()
     
     // Refresh prices every 2 seconds for real-time P/L updates
     const priceInterval = setInterval(() => {
@@ -158,6 +157,47 @@ const TradingPage = () => {
       priceService.disconnect()
     }
   }, [accountId])
+
+  // Fetch spreads when account is loaded (to get correct accountTypeId)
+  useEffect(() => {
+    if (account?.accountTypeId?._id) {
+      fetchAdminSpreads(account.accountTypeId._id)
+    } else if (account && !account.accountTypeId) {
+      // For accounts without accountTypeId (like challenge accounts), fetch default spreads
+      fetchAdminSpreads()
+    }
+  }, [account])
+
+  // Re-apply spreads to instruments when adminSpreads changes
+  useEffect(() => {
+    if (Object.keys(adminSpreads).length === 0) return
+    
+    // Update instruments with current spreads
+    setInstruments(prev => prev.map(inst => {
+      const adminSpreadPips = adminSpreads[inst.symbol]?.spread || 0
+      if (adminSpreadPips > 0 && inst.bid > 0) {
+        const adminSpread = pipsToPrice(inst.symbol, adminSpreadPips)
+        const rawAsk = inst.ask - (inst.spread || 0) // Get raw ask without previous spread
+        const newAsk = inst.bid + adminSpread // Add spread to bid to get new ask
+        return { ...inst, ask: newAsk, spread: adminSpread }
+      }
+      return inst
+    }))
+    
+    // Update selected instrument
+    if (selectedInstrument?.bid > 0) {
+      const adminSpreadPips = adminSpreads[selectedInstrument.symbol]?.spread || 0
+      if (adminSpreadPips > 0) {
+        const adminSpread = pipsToPrice(selectedInstrument.symbol, adminSpreadPips)
+        const newAsk = selectedInstrument.bid + adminSpread
+        setSelectedInstrument(prev => ({
+          ...prev,
+          ask: newAsk,
+          spread: adminSpread
+        }))
+      }
+    }
+  }, [adminSpreads])
 
   // Fetch open trades and account summary when account is loaded
   useEffect(() => {
@@ -219,11 +259,12 @@ const TradingPage = () => {
         if (priceData && priceData.bid && priceData.bid > 0) {
           const bid = priceData.bid
           const marketAsk = priceData.ask || priceData.bid
-          // Apply admin spread if set
-          const adminSpread = currentAdminSpreads[inst.symbol]?.spread || 0
-          const ask = marketAsk + adminSpread
-          const spread = Math.abs(ask - bid) || (bid * 0.0001)
-          return { ...inst, bid, ask, spread }
+          // Apply admin spread if set (convert pips to price) - add to bid to get ask
+          const adminSpreadPips = currentAdminSpreads[inst.symbol]?.spread || 0
+          const adminSpread = pipsToPrice(inst.symbol, adminSpreadPips)
+          // Ask = Bid + AdminSpread if spread is set, else use market ask
+          const ask = adminSpread > 0 ? bid + adminSpread : marketAsk
+          return { ...inst, bid, ask, spread: adminSpread > 0 ? adminSpread : Math.abs(marketAsk - bid) }
         }
         return inst
       }))
@@ -231,14 +272,17 @@ const TradingPage = () => {
       // Update selected instrument with admin spread (only if price is valid)
       const selectedPrice = prices[selectedInstrument?.symbol]
       if (selectedPrice && selectedPrice.bid && selectedPrice.bid > 0) {
+        const bid = selectedPrice.bid
         const marketAsk = selectedPrice.ask || selectedPrice.bid
-        const adminSpread = currentAdminSpreads[selectedInstrument?.symbol]?.spread || 0
-        const ask = marketAsk + adminSpread
+        const adminSpreadPips = currentAdminSpreads[selectedInstrument?.symbol]?.spread || 0
+        const adminSpread = pipsToPrice(selectedInstrument?.symbol, adminSpreadPips)
+        // Ask = Bid + AdminSpread if spread is set, else use market ask
+        const ask = adminSpread > 0 ? bid + adminSpread : marketAsk
         setSelectedInstrument(prev => ({
           ...prev,
-          bid: selectedPrice.bid,
+          bid: bid,
           ask: ask,
-          spread: Math.abs(ask - selectedPrice.bid)
+          spread: adminSpread > 0 ? adminSpread : Math.abs(marketAsk - bid)
         }))
       }
     })
@@ -409,18 +453,17 @@ const TradingPage = () => {
         setInstruments(prev => prev.map(inst => {
           const priceData = allPrices[inst.symbol]
           if (priceData && priceData.bid) {
-            // Use bid for both if ask not provided, add admin spread
             const bid = priceData.bid
             const marketAsk = priceData.ask || priceData.bid
-            // Apply admin spread if set (add to ask price)
-            const adminSpread = currentAdminSpreads[inst.symbol]?.spread || 0
-            const ask = marketAsk + adminSpread
-            const spread = Math.abs(ask - bid) || (bid * 0.0001) // Default spread if same
+            // Apply admin spread if set - Ask = Bid + AdminSpread, else use market ask
+            const adminSpreadPips = currentAdminSpreads[inst.symbol]?.spread || 0
+            const adminSpread = pipsToPrice(inst.symbol, adminSpreadPips)
+            const ask = adminSpread > 0 ? bid + adminSpread : marketAsk
             return {
               ...inst,
               bid: bid,
               ask: ask,
-              spread: spread
+              spread: adminSpread > 0 ? adminSpread : Math.abs(marketAsk - bid)
             }
           }
           return inst
@@ -432,17 +475,15 @@ const TradingPage = () => {
           if (priceData && priceData.bid) {
             const bid = priceData.bid
             const marketAsk = priceData.ask || priceData.bid
-            // Apply admin spread if set (add to ask price)
-            const adminSpread = currentAdminSpreads[prev.symbol]?.spread || 0
-            const ask = marketAsk + adminSpread
-            if (adminSpread > 0) {
-              console.log(`[Spread] ${prev.symbol}: marketAsk=${marketAsk}, adminSpread=${adminSpread}, finalAsk=${ask}`)
-            }
+            // Apply admin spread - Ask = Bid + AdminSpread, else market ask
+            const adminSpreadPips = currentAdminSpreads[prev.symbol]?.spread || 0
+            const adminSpread = pipsToPrice(prev.symbol, adminSpreadPips)
+            const ask = adminSpread > 0 ? bid + adminSpread : marketAsk
             return {
               ...prev,
               bid: bid,
               ask: ask,
-              spread: Math.abs(ask - bid) || (bid * 0.0001)
+              spread: adminSpread > 0 ? adminSpread : Math.abs(marketAsk - bid)
             }
           }
           return prev
@@ -454,14 +495,15 @@ const TradingPage = () => {
           if (priceData && priceData.bid) {
             const bid = priceData.bid
             const marketAsk = priceData.ask || priceData.bid
-            // Apply admin spread if set (add to ask price)
-            const adminSpread = currentAdminSpreads[tab.symbol]?.spread || 0
-            const ask = marketAsk + adminSpread
+            // Apply admin spread - Ask = Bid + AdminSpread, else market ask
+            const adminSpreadPips = currentAdminSpreads[tab.symbol]?.spread || 0
+            const adminSpread = pipsToPrice(tab.symbol, adminSpreadPips)
+            const ask = adminSpread > 0 ? bid + adminSpread : marketAsk
             return {
               ...tab,
               bid: bid,
               ask: ask,
-              spread: Math.abs(ask - bid) || (bid * 0.0001)
+              spread: adminSpread > 0 ? adminSpread : Math.abs(marketAsk - bid)
             }
           }
           return tab
@@ -524,12 +566,33 @@ const TradingPage = () => {
     return 'Forex'
   }
 
-  // Fetch admin-set spreads for instruments
-  const fetchAdminSpreads = async () => {
+  // Convert pips to actual price value based on instrument type
+  const pipsToPrice = (symbol, pips) => {
+    if (!pips || pips === 0) return 0
+    // JPY pairs: 1 pip = 0.01
+    if (symbol.includes('JPY')) return pips * 0.01
+    // Gold/Metals: 1 pip = 0.01
+    if (['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD'].includes(symbol)) return pips * 0.01
+    // Indices: 1 pip = 0.1 or 1
+    if (['US30', 'US500', 'NAS100', 'UK100', 'GER40', 'FRA40', 'JPN225', 'AUS200', 'VIX'].includes(symbol)) return pips * 0.1
+    // Crypto: 1 pip = 0.01
+    if (symbol.endsWith('USD') && !symbol.includes('EUR') && !symbol.includes('GBP') && !symbol.includes('AUD') && !symbol.includes('NZD') && !symbol.includes('CAD') && !symbol.includes('CHF')) {
+      const cryptoSymbols = ['BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BNBUSD', 'SOLUSD', 'ADAUSD', 'DOGEUSD', 'DOTUSD', 'MATICUSD', 'AVAXUSD', 'LINKUSD', 'SHIBUSD']
+      if (cryptoSymbols.some(c => symbol.includes(c.replace('USD', '')))) return pips * 0.01
+    }
+    // Standard Forex pairs: 1 pip = 0.0001
+    return pips * 0.0001
+  }
+
+  // Fetch admin-set spreads for instruments (pass accountTypeId for hierarchy)
+  const fetchAdminSpreads = async (accountTypeId = null) => {
     try {
-      const res = await fetch(`${API_URL}/charges/spreads`)
+      const url = accountTypeId 
+        ? `${API_URL}/charges/spreads?accountTypeId=${accountTypeId}`
+        : `${API_URL}/charges/spreads`
+      const res = await fetch(url)
       const data = await res.json()
-      console.log('[AdminSpreads] Fetched:', data)
+      console.log('[AdminSpreads] Fetched:', data, 'accountTypeId:', accountTypeId)
       if (data.success) {
         const spreads = data.spreads || {}
         console.log('[AdminSpreads] Setting spreads:', spreads)
@@ -1614,13 +1677,8 @@ const TradingPage = () => {
                         <div className={`text-[9px] ${isDarkMode ? 'text-gray-600' : 'text-gray-500'}`}>Bid</div>
                       </div>
                       <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium min-w-[28px] text-center mx-2 ${isDarkMode ? 'bg-[#2a2a2a] text-cyan-400' : 'bg-blue-100 text-blue-600'}`}>
-                        {/* Show admin-set spread if available, otherwise show 0 */}
-                        {adminSpreads[inst.symbol]?.spread > 0 ? (
-                          // Convert admin spread to pips for display
-                          inst.symbol.includes('JPY') ? (adminSpreads[inst.symbol].spread * 100).toFixed(1) :
-                          inst.bid > 100 ? adminSpreads[inst.symbol].spread.toFixed(2) :
-                          (adminSpreads[inst.symbol].spread * 10000).toFixed(1)
-                        ) : '0'}
+                        {/* Show admin-set spread in pips - already stored as pips */}
+                        {adminSpreads[inst.symbol]?.spread > 0 ? adminSpreads[inst.symbol].spread : '0'}
                       </div>
                       <div className="text-right w-14">
                         <div className="text-green-500 text-xs font-mono">

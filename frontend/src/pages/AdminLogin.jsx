@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Mail, Shield, UserCog, KeyRound } from 'lucide-react'
+import { X, Mail, Shield, UserCog, Lock, Eye, EyeOff } from 'lucide-react'
 import { API_URL } from '../config/api'
 import logo from '../assets/logo.png'
 import toast from 'react-hot-toast'
@@ -10,14 +10,14 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [email, setEmail] = useState('')
-  const [showOtpScreen, setShowOtpScreen] = useState(false)
-  const [otp, setOtp] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!email) {
-      setError('Email is required')
+    if (!email || !password) {
+      setError('Email and password are required')
       return
     }
     
@@ -25,35 +25,10 @@ const AdminLogin = () => {
     setError('')
     
     try {
-      const res = await fetch(`${API_URL}/admin-mgmt/send-login-otp`, {
+      const res = await fetch(`${API_URL}/admin-mgmt/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      })
-      const data = await res.json()
-      
-      if (data.success) {
-        setShowOtpScreen(true)
-        toast.success('OTP sent to your email!')
-      } else {
-        setError(data.message || 'Failed to send OTP')
-      }
-    } catch (err) {
-      setError('Connection error. Please try again.')
-    }
-    setLoading(false)
-  }
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    
-    try {
-      const res = await fetch(`${API_URL}/admin-mgmt/verify-login-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp })
+        body: JSON.stringify({ email, password })
       })
       const data = await res.json()
       
@@ -63,30 +38,7 @@ const AdminLogin = () => {
         toast.success('Admin login successful!')
         navigate('/admin/dashboard')
       } else {
-        setError(data.message || 'Invalid OTP')
-      }
-    } catch (err) {
-      setError('Connection error. Please try again.')
-    }
-    setLoading(false)
-  }
-
-  const handleResendOtp = async () => {
-    setLoading(true)
-    setError('')
-    
-    try {
-      const res = await fetch(`${API_URL}/admin-mgmt/send-login-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      })
-      const data = await res.json()
-      
-      if (data.success) {
-        toast.success('OTP resent to your email!')
-      } else {
-        setError(data.message || 'Failed to resend OTP')
+        setError(data.message || 'Invalid credentials')
       }
     } catch (err) {
       setError('Connection error. Please try again.')
@@ -137,88 +89,55 @@ const AdminLogin = () => {
           </button>
         </div>
 
-        {!showOtpScreen ? (
-          <>
-            <h1 className="text-2xl font-semibold text-white mb-2">Super Admin Login</h1>
-            <p className="text-gray-500 text-sm mb-6">Enter your email to receive OTP</p>
+        <h1 className="text-2xl font-semibold text-white mb-2">Super Admin Login</h1>
+        <p className="text-gray-500 text-sm mb-6">Enter your credentials to continue</p>
 
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              <div>
-                <div className="relative">
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                    className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors"
-                  />
-                </div>
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div>
+            <div className="relative">
+              <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="email"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors"
+              />
+            </div>
+          </div>
 
-              {error && (
-                <p className="text-red-500 text-sm">{error}</p>
-              )}
-
+          <div>
+            <div className="relative">
+              <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-11 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors"
+              />
               <button
-                type="submit"
-                disabled={loading || !email}
-                className="w-full text-white font-medium py-3 rounded-lg transition-colors mt-2 disabled:opacity-50 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
               >
-                {loading ? 'Sending OTP...' : 'Send OTP'}
-              </button>
-            </form>
-          </>
-        ) : (
-          <>
-            <h1 className="text-2xl font-semibold text-white mb-2">Verify OTP</h1>
-            <p className="text-gray-500 text-sm mb-6">Enter the 6-digit OTP sent to {email}</p>
-
-            <form onSubmit={handleVerifyOtp} className="space-y-4" noValidate>
-              <div>
-                <div className="relative">
-                  <KeyRound size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-                  <input
-                    type="text"
-                    placeholder="Enter 6-digit OTP"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full bg-dark-600 border border-gray-700 rounded-lg pl-11 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors text-center text-xl tracking-widest"
-                    maxLength={6}
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <p className="text-red-500 text-sm">{error}</p>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading || otp.length !== 6}
-                className="w-full text-white font-medium py-3 rounded-lg transition-colors mt-2 disabled:opacity-50 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-              >
-                {loading ? 'Verifying...' : 'Verify OTP'}
-              </button>
-            </form>
-
-            <div className="flex items-center justify-between mt-4">
-              <button
-                onClick={() => { setShowOtpScreen(false); setOtp(''); setError(''); }}
-                className="text-gray-400 hover:text-white text-sm"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={handleResendOtp}
-                disabled={loading}
-                className="text-blue-400 hover:text-blue-300 text-sm disabled:opacity-50"
-              >
-                Resend OTP
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-          </>
-        )}
+          </div>
+
+          {error && (
+            <p className="text-red-500 text-sm">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !email || !password}
+            className="w-full text-white font-medium py-3 rounded-lg transition-colors mt-2 disabled:opacity-50 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+          >
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
 
         <p className="text-center text-gray-500 text-sm mt-6">
           Not an admin?{' '}

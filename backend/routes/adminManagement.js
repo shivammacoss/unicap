@@ -240,7 +240,7 @@ router.post('/verify-login-otp', async (req, res) => {
   }
 })
 
-// POST /api/admin-mgmt/login - Super Admin login only (for /admin route) - LEGACY (redirects to OTP flow)
+// POST /api/admin-mgmt/login - Super Admin login with email/password
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
@@ -262,13 +262,6 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, admin.password)
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
-    }
-
-    // Check if OTP verification is enabled
-    const otpEnabled = await isOTPEnabled()
-    if (otpEnabled) {
-      // Redirect to OTP flow
-      return res.json({ success: true, otpRequired: true, message: 'Please use OTP verification' })
     }
 
     // Update last login

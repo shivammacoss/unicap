@@ -13,17 +13,43 @@ router.get('/spreads', async (req, res) => {
     const charges = await Charges.find({ isActive: true, spreadValue: { $gt: 0 } })
       .sort({ level: 1 })
     
-    // Build a map of symbol -> spread (respecting hierarchy)
+    // Filter charges based on accountTypeId if provided
+    const filteredCharges = charges.filter(charge => {
+      // ACCOUNT_TYPE level - only include if matches the provided accountTypeId
+      if (charge.level === 'ACCOUNT_TYPE') {
+        if (!accountTypeId) return false // Skip if no accountTypeId provided
+        return charge.accountTypeId?.toString() === accountTypeId
+      }
+      // USER level - only include if matches userId
+      if (charge.level === 'USER') {
+        if (!userId) return false
+        return charge.userId?.toString() === userId
+      }
+      // Include all other levels (SEGMENT, GLOBAL, INSTRUMENT)
+      return true
+    })
+    
+    // Sort by priority (most specific first)
+    const priorityOrder = { 'USER': 1, 'INSTRUMENT': 2, 'ACCOUNT_TYPE': 3, 'SEGMENT': 4, 'GLOBAL': 5 }
+    filteredCharges.sort((a, b) => priorityOrder[a.level] - priorityOrder[b.level])
+    
+    // Build a map of symbol -> spread (most specific wins)
     const spreadMap = {}
     
-    // Priority order: USER > INSTRUMENT > ACCOUNT_TYPE > SEGMENT > GLOBAL
-    const priorityOrder = { 'USER': 1, 'INSTRUMENT': 2, 'ACCOUNT_TYPE': 3, 'SEGMENT': 4, 'GLOBAL': 5 }
+    const segmentSymbols = {
+      'Forex': ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'EURGBP', 'EURJPY', 'GBPJPY', 'EURCHF', 'EURAUD', 'AUDCAD', 'AUDJPY', 'CADJPY', 'EURAUD', 'NZDCHF', 'NZDJPY', 'AUDNZD', 'GBPAUD', 'GBPCAD', 'GBPCHF', 'GBPNZD', 'CADCHF', 'CHFJPY', 'EURCAD', 'EURNZD', 'USDHKD', 'USDSGD', 'USDMXN', 'USDZAR', 'USDTRY', 'USDPLN', 'USDSEK', 'USDNOK', 'USDDKK'],
+      'Metals': ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XAUEUR', 'XAUAUD', 'XAUGBP', 'XAUCHF', 'XAUJPY', 'XAGEUR'],
+      'Crypto': ['BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BNBUSD', 'SOLUSD', 'ADAUSD', 'DOGEUSD', 'DOTUSD', 'MATICUSD', 'AVAXUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'ATOMUSD', 'APTUSD', 'ARBUSD', 'AXSUSD', 'BLURUSD', 'FETUSD', 'FILUSD', 'FLOWUSD', 'FTMUSD', 'GALAUSD', 'GMTUSD', 'GRTUSD', 'ICPUSD', 'IMXUSD', 'INJUSD', 'LDOUSD', 'MANAUSD', 'NEARUSD', 'OPUSD', 'PEPEUSD', 'SANDUSD', 'SEIUSD', 'STXUSD', 'SUIUSD', 'TIAUSD', 'TONUSD', 'TRXUSD', 'VETUSD', 'WLDUSD', 'XLMUSD', 'XMRUSD', 'XTZUSD', 'ZECUSD', 'ETCUSD', 'AABORUSD', 'ALGOUSD', 'EOSUSD', 'THETAUSD'],
+      'Indices': ['US30', 'US500', 'NAS100', 'UK100', 'GER40', 'FRA40', 'JPN225', 'AUS200', 'SPX500', 'DJ30', 'USTEC', 'USDX', 'VIX'],
+      'Commodities': ['USOIL', 'UKOIL', 'NGAS']
+    }
+    const allSymbols = Object.values(segmentSymbols).flat()
     
-    for (const charge of charges) {
+    // Process charges in priority order (most specific first sets the value)
+    for (const charge of filteredCharges) {
       // For instrument-specific charges
       if (charge.instrumentSymbol) {
-        const existing = spreadMap[charge.instrumentSymbol]
-        if (!existing || priorityOrder[charge.level] < priorityOrder[existing.level]) {
+        if (!spreadMap[charge.instrumentSymbol]) {
           spreadMap[charge.instrumentSymbol] = {
             spread: charge.spreadValue,
             spreadType: charge.spreadType,
@@ -31,19 +57,11 @@ router.get('/spreads', async (req, res) => {
           }
         }
       }
-      // For segment-level charges, apply to all instruments in that segment
-      else if (charge.segment) {
-        const segmentSymbols = {
-          'Forex': ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'EURGBP', 'EURJPY', 'GBPJPY', 'EURCHF', 'EURAUD', 'AUDCAD', 'AUDJPY', 'CADJPY'],
-          'Metals': ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'XAUEUR', 'XAUAUD', 'XAUGBP', 'XAUCHF', 'XAUJPY', 'XAGEUR'],
-          'Crypto': ['BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD', 'BNBUSD', 'SOLUSD', 'ADAUSD', 'DOGEUSD', 'DOTUSD', 'MATICUSD', 'AVAXUSD', 'LINKUSD', 'SHIBUSD', 'UNIUSD', 'ATOMUSD'],
-          'Indices': ['US30', 'US500', 'NAS100', 'UK100', 'GER40', 'FRA40', 'JPN225', 'AUS200', 'SPX500', 'DJ30', 'USTEC', 'USDX', 'VIX'],
-          'Commodities': ['USOIL', 'UKOIL', 'NGAS']
-        }
-        const symbols = segmentSymbols[charge.segment] || []
-        for (const symbol of symbols) {
-          const existing = spreadMap[symbol]
-          if (!existing || priorityOrder[charge.level] < priorityOrder[existing.level]) {
+      // For ACCOUNT_TYPE level - apply to all symbols if no specific segment
+      else if (charge.level === 'ACCOUNT_TYPE') {
+        const symbolsToApply = charge.segment ? (segmentSymbols[charge.segment] || []) : allSymbols
+        for (const symbol of symbolsToApply) {
+          if (!spreadMap[symbol]) {
             spreadMap[symbol] = {
               spread: charge.spreadValue,
               spreadType: charge.spreadType,
@@ -52,9 +70,21 @@ router.get('/spreads', async (req, res) => {
           }
         }
       }
-      // For global charges, apply to all instruments that don't have specific settings
+      // For segment-level charges
+      else if (charge.segment || charge.level === 'SEGMENT') {
+        const symbolsToApply = charge.segment ? (segmentSymbols[charge.segment] || []) : allSymbols
+        for (const symbol of symbolsToApply) {
+          if (!spreadMap[symbol]) {
+            spreadMap[symbol] = {
+              spread: charge.spreadValue,
+              spreadType: charge.spreadType,
+              level: charge.level
+            }
+          }
+        }
+      }
+      // For global charges
       else if (charge.level === 'GLOBAL') {
-        const allSymbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'NZDUSD', 'USDCAD', 'EURGBP', 'EURJPY', 'GBPJPY', 'XAUUSD', 'XAGUSD', 'BTCUSD', 'ETHUSD', 'LTCUSD', 'XRPUSD']
         for (const symbol of allSymbols) {
           if (!spreadMap[symbol]) {
             spreadMap[symbol] = {
