@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import { Hero, Navigation, About, Funding, Contact, Footer } from '../components/home'
+import { 
+  Hero, 
+  Navigation, 
+  Services, 
+  Instruments, 
+  FundingPlans, 
+  Testimonials, 
+  Contact, 
+  Footer 
+} from '../components/home'
 
 function HomePage() {
   return (
     <>
       <Hero />
-      <About />
-      <Funding />
+      <Services />
+      <Instruments />
+      <FundingPlans />
+      <Testimonials />
       <Contact />
       <Footer />
     </>
@@ -26,7 +36,7 @@ function WebsiteLandingPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0f1a] text-white overflow-x-hidden">
       <Navigation scrollY={scrollY} />
       <HomePage />
     </div>
