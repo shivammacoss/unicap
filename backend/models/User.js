@@ -98,6 +98,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  ibRejectionReason: {
+    type: String,
+    default: null
+  },
   
   // Assigned Admin (for multi-admin system)
   assignedAdmin: {

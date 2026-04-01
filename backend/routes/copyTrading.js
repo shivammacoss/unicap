@@ -7,6 +7,8 @@ import CopySettings from '../models/CopySettings.js'
 import TradingAccount from '../models/TradingAccount.js'
 import Trade from '../models/Trade.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
+import tradeEngine from '../services/tradeEngine.js'
+import infowayService from '../services/infowayService.js'
 
 const router = express.Router()
 
@@ -502,10 +504,36 @@ router.get('/my-copy-trades/:userId', async (req, res) => {
 
     const copyTrades = await CopyTrade.find(query)
       .populate('masterId', 'displayName')
+      .populate('followerTradeId')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
 
-    res.json({ copyTrades })
+    const enriched = copyTrades.map((ct) => {
+      const plain = ct.toObject ? ct.toObject() : { ...ct }
+      let liveFloatingPnl = null
+      if (
+        ct.status === 'OPEN' &&
+        ct.followerTradeId &&
+        typeof ct.followerTradeId === 'object' &&
+        ct.followerTradeId.status === 'OPEN'
+      ) {
+        const ft = ct.followerTradeId
+        const px = infowayService.getPrice(ft.symbol)
+        if (px && Number(px.bid) > 0 && Number(px.ask) > 0) {
+          liveFloatingPnl =
+            Math.round(tradeEngine.calculateFloatingPnl(ft, px.bid, px.ask) * 100) / 100
+        }
+      }
+      const displayPnl =
+        ct.status === 'CLOSED'
+          ? ct.followerPnl ?? 0
+          : liveFloatingPnl !== null
+            ? liveFloatingPnl
+            : null
+      return { ...plain, liveFloatingPnl, displayPnl }
+    })
+
+    res.json({ copyTrades: enriched })
   } catch (error) {
     res.status(500).json({ message: 'Error fetching copy trades', error: error.message })
   }

@@ -6,7 +6,6 @@ import Charges from '../models/Charges.js'
 import tradeEngine from '../services/tradeEngine.js'
 import propTradingEngine from '../services/propTradingEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
-import ibEngine from '../services/ibEngineNew.js'
 import MasterTrader from '../models/MasterTrader.js'
 import infowayService from '../services/infowayService.js'
 
@@ -286,37 +285,7 @@ router.post('/close', async (req, res) => {
       'USER'
     )
 
-    // Check if this was a master trade and close follower trades
-    if (tradeToClose) {
-      console.log(`[CopyTrade] Checking if trade ${tradeId} belongs to a master. TradingAccountId: ${tradeToClose.tradingAccountId}`)
-      const master = await MasterTrader.findOne({ 
-        tradingAccountId: tradeToClose.tradingAccountId, 
-        status: 'ACTIVE' 
-      })
-      
-      console.log(`[CopyTrade] Master found: ${master ? master._id : 'NO MASTER FOUND'}`)
-      
-      if (master) {
-        try {
-          const closePrice = tradeToClose.side === 'BUY' ? parseFloat(bid) : parseFloat(ask)
-          console.log(`[CopyTrade] Calling closeFollowerTrades for master trade ${tradeId} at price ${closePrice}`)
-          const copyResults = await copyTradingEngine.closeFollowerTrades(tradeId, closePrice)
-          console.log(`[CopyTrade] Closed ${copyResults.length} follower trades for master trade ${tradeId}`)
-        } catch (copyError) {
-          console.error('[CopyTrade] Error closing follower trades:', copyError)
-        }
-      }
-    }
-
-    // Process IB commission for the closed trade
-    try {
-      const ibResult = await ibEngine.processTradeCommission(result.trade)
-      if (ibResult.processed) {
-        console.log(`IB commission processed for trade ${result.trade._id}: ${ibResult.commissions?.length || 0} IBs credited`)
-      }
-    } catch (ibError) {
-      console.error('Error processing IB commission:', ibError)
-    }
+    // Copy followers are closed inside tradeEngine.closeTrade (awaited)
 
     res.json({
       success: true,

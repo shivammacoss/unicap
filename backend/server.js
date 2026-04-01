@@ -38,6 +38,7 @@ import { fileURLToPath } from 'url'
 import copyTradingEngine from './services/copyTradingEngine.js'
 import tradeEngine from './services/tradeEngine.js'
 import propTradingEngine from './services/propTradingEngine.js'
+import { ibEvents } from './services/ibEvents.js'
 import infowayService from './services/infowayService.js'
 import EmailTemplate from './models/EmailTemplate.js'
 import { seedEmailTemplates } from './routes/emailTemplates.js'
@@ -186,6 +187,14 @@ io.on('connection', (socket) => {
 // Make io accessible to routes
 app.set('io', io)
 
+ibEvents.on('IB_COMMISSION_DISTRIBUTED', (payload) => {
+  try {
+    io.emit('ibCommissionDistributed', payload)
+  } catch (e) {
+    console.error('[IB] socket emit', e)
+  }
+})
+
 // Middleware
 app.use(compression())
 app.use(cors())
@@ -212,6 +221,16 @@ app.use('/api/trade', tradeRoutes)
 app.use('/api/wallet-transfer', walletTransferRoutes)
 app.use('/api/admin/trade', adminTradeRoutes)
 app.use('/api/copy', copyTradingRoutes)
+// Spec: /api/admin/ib/* mirrors /api/ib/admin/*
+app.use('/api/admin/ib', (req, res, next) => {
+  const u = req.url || '/'
+  const qIndex = u.indexOf('?')
+  const pathOnly = qIndex >= 0 ? u.slice(0, qIndex) : u
+  const qs = qIndex >= 0 ? u.slice(qIndex) : ''
+  const suffix = pathOnly === '/' ? '' : pathOnly
+  req.url = '/admin' + suffix + qs
+  ibRoutes(req, res, next)
+})
 app.use('/api/ib', ibRoutes)
 app.use('/api/prop', propTradingRoutes)
 app.use('/api/charges', chargesRoutes)

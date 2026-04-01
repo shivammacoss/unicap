@@ -8,9 +8,34 @@ import TradeSettings from '../models/TradeSettings.js'
 import AdminLog from '../models/AdminLog.js'
 import tradeEngine from '../services/tradeEngine.js'
 import copyTradingEngine from '../services/copyTradingEngine.js'
-import MasterTrader from '../models/MasterTrader.js'
 
 const router = express.Router()
+
+/** Resolve trading account id whether Trade doc has ObjectId or populated ref */
+function getTradingAccountIdRaw(trade) {
+  const tid = trade.tradingAccountId
+  if (!tid) return null
+  return tid._id ? tid._id : tid
+}
+
+/** When a master's position closes, close mirrored follower trades (same as user close / tradeEngine). */
+async function propagateMasterCloseToFollowers(trade, closePrice, bid = null, ask = null) {
+  try {
+    if (!trade?._id || closePrice == null || Number.isNaN(Number(closePrice))) {
+      return { followersClosed: 0, followerResults: [] }
+    }
+    const p = Number(closePrice)
+    const b = bid != null && !Number.isNaN(Number(bid)) ? Number(bid) : p
+    const a = ask != null && !Number.isNaN(Number(ask)) ? Number(ask) : p
+    // Do not require MasterTrader row: CopyTrade is keyed by master trade id; avoids missing sync on id mismatch.
+    const followerResults = await copyTradingEngine.closeFollowerTrades(trade._id, b, a)
+    const followersClosed = followerResults.filter((r) => r.status === 'SUCCESS').length
+    return { followersClosed, followerResults }
+  } catch (e) {
+    console.error('[AdminTrade] propagateMasterCloseToFollowers:', e)
+    return { followersClosed: 0, followerResults: [], error: e.message }
+  }
+}
 
 // GET /api/admin/trade/all - Get all trades with pagination (for admin dashboard)
 router.get('/all', async (req, res) => {
@@ -173,6 +198,9 @@ router.put('/edit/:tradeId', async (req, res) => {
     if (openedAt !== undefined && openedAt !== null) trade.openedAt = new Date(openedAt)
     if (closedAt !== undefined && closedAt !== null) trade.closedAt = new Date(closedAt)
     
+    const wasOpenBeforeClose = trade.status === 'OPEN'
+    let closedMasterViaEdit = false
+
     // If close price is set, update P&L and potentially close the trade
     if (closePrice !== undefined && closePrice !== null && closePrice !== '') {
       trade.closePrice = closePrice
@@ -190,16 +218,18 @@ router.put('/edit/:tradeId', async (req, res) => {
       
       // If trade was open, close it and update account balance
       if (trade.status === 'OPEN') {
+        closedMasterViaEdit = true
         trade.status = 'CLOSED'
         trade.closedBy = 'ADMIN'
         trade.closedAt = new Date()
         
         // Update account balance with P&L - handle both account types
         let account = null
+        const accId = getTradingAccountIdRaw(trade)
         if (trade.accountType === 'ChallengeAccount' || trade.isChallengeAccount) {
-          account = await ChallengeAccount.findById(trade.tradingAccountId)
+          account = await ChallengeAccount.findById(accId)
         } else {
-          account = await TradingAccount.findById(trade.tradingAccountId)
+          account = await TradingAccount.findById(accId)
         }
         if (account) {
           account.balance += trade.realizedPnl
@@ -240,10 +270,20 @@ router.put('/edit/:tradeId', async (req, res) => {
 
     await trade.save()
 
+    let followersClosed = 0
+    if (closedMasterViaEdit && wasOpenBeforeClose && trade.status === 'CLOSED' && trade.closePrice != null) {
+      const { followersClosed: fc } = await propagateMasterCloseToFollowers(trade, trade.closePrice)
+      followersClosed = fc
+      if (followersClosed > 0) {
+        console.log(`[AdminTrade] Edit closed master trade; synced ${followersClosed} follower copy trades`)
+      }
+    }
+
     res.json({ 
       success: true, 
       message: 'Trade updated successfully', 
       trade,
+      followersClosed,
       changes: {
         old: oldValues,
         new: {
@@ -299,10 +339,11 @@ router.post('/close/:tradeId', async (req, res) => {
 
     // Update account balance - handle both TradingAccount and ChallengeAccount
     let account = null
+    const closeAccId = getTradingAccountIdRaw(trade)
     if (trade.accountType === 'ChallengeAccount' || trade.isChallengeAccount) {
-      account = await ChallengeAccount.findById(trade.tradingAccountId)
+      account = await ChallengeAccount.findById(closeAccId)
     } else {
-      account = await TradingAccount.findById(trade.tradingAccountId)
+      account = await TradingAccount.findById(closeAccId)
     }
     
     if (account) {
@@ -311,13 +352,9 @@ router.post('/close/:tradeId', async (req, res) => {
       await account.save()
     }
 
-    // Check if this is a master trader's trade and close follower trades
-    let followerResults = []
-    const master = await MasterTrader.findOne({ tradingAccountId: trade.tradingAccountId, status: 'ACTIVE' })
-    if (master) {
-      console.log(`[AdminTrade] Master trade closed, propagating to followers. TradeId: ${tradeId}, ClosePrice: ${finalClosePrice}`)
-      followerResults = await copyTradingEngine.closeFollowerTrades(trade._id, finalClosePrice)
-      console.log(`[AdminTrade] Closed ${followerResults.length} follower trades`)
+    const { followersClosed, followerResults } = await propagateMasterCloseToFollowers(trade, finalClosePrice)
+    if (followersClosed > 0) {
+      console.log(`[AdminTrade] Master trade closed; synced ${followersClosed} follower trades`)
     }
 
     res.json({    
@@ -325,7 +362,8 @@ router.post('/close/:tradeId', async (req, res) => {
       message: 'Trade closed', 
       trade, 
       realizedPnl,
-      followersClosed: followerResults.length 
+      followersClosed,
+      followerResults
     })
   } catch (error) {
     console.error('Error closing trade:', error)

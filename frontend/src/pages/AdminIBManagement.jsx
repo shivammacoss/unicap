@@ -27,7 +27,7 @@ import {
 
 const AdminIBManagement = () => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [activeTab, setActiveTab] = useState('ibs') // ibs, applications, plans, settings, transfer
+  const [activeTab, setActiveTab] = useState('ibs') // ibs, applications, commission, plans, settings, transfer
   const [ibs, setIbs] = useState([])
   const [applications, setApplications] = useState([])
   const [plans, setPlans] = useState([])
@@ -56,6 +56,12 @@ const AdminIBManagement = () => {
   const [ibCommission, setIbCommission] = useState('')
   const [ibPlan, setIbPlan] = useState('')
   const [savingIB, setSavingIB] = useState(false)
+
+  const [commissionGrouped, setCommissionGrouped] = useState([])
+  const [commissionAccountTypes, setCommissionAccountTypes] = useState([])
+  const [commissionEditTypeId, setCommissionEditTypeId] = useState(null)
+  const [commissionLevelsDraft, setCommissionLevelsDraft] = useState([])
+  const [savingCommission, setSavingCommission] = useState(false)
 
   useEffect(() => {
     fetchDashboard()
@@ -184,10 +190,127 @@ const AdminIBManagement = () => {
     try {
       const res = await fetch(`${API_URL}/ib/admin/pending`)
       const data = await res.json()
-      setApplications(data.pending || [])
+      let rows = []
+      if (data.applications && data.applications.length > 0) {
+        rows = data.applications.map((a) => ({
+          kind: 'application',
+          _id: a._id,
+          userId: a.userId?._id || a.userId,
+          firstName: a.userId?.firstName,
+          lastName: a.userId?.lastName,
+          email: a.userId?.email,
+          createdAt: a.appliedAt || a.createdAt,
+          referredByIb: a.referredByIbUserId
+        }))
+      } else {
+        rows = (data.pending || []).map((u) => ({
+          kind: 'legacy',
+          _id: u._id,
+          userId: u._id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          createdAt: u.createdAt,
+          referredByIb: null
+        }))
+      }
+      setApplications(rows)
     } catch (error) {
       console.error('Error fetching applications:', error)
     }
+  }
+
+  const fetchCommissionConfig = async () => {
+    try {
+      const res = await fetch(`${API_URL}/ib/admin/commission-config`)
+      const data = await res.json()
+      if (data.success) {
+        setCommissionGrouped(data.configs || [])
+        setCommissionAccountTypes(data.accountTypes || [])
+        const first = data.configs?.[0]
+        if (first?.accountType?._id) {
+          setCommissionEditTypeId(first.accountType._id)
+          setCommissionLevelsDraft(
+            (first.levels || []).map((l) => ({
+              level: l.level,
+              commissionPercent: l.commissionPercent,
+              isActive: l.isActive !== false
+            }))
+          )
+        } else if (data.accountTypes?.[0]?._id) {
+          setCommissionEditTypeId(data.accountTypes[0]._id)
+          setCommissionLevelsDraft([])
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching commission config:', e)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'commission') fetchCommissionConfig()
+  }, [activeTab])
+
+  const selectCommissionAccountType = (typeId) => {
+    setCommissionEditTypeId(typeId)
+    const g = commissionGrouped.find(
+      (c) => String(c.accountType._id) === String(typeId)
+    )
+    setCommissionLevelsDraft(
+      (g?.levels || []).map((l) => ({
+        level: l.level,
+        commissionPercent: l.commissionPercent,
+        isActive: l.isActive !== false
+      }))
+    )
+  }
+
+  const saveCommissionConfig = async () => {
+    if (!commissionEditTypeId) return
+    setSavingCommission(true)
+    try {
+      const res = await fetch(`${API_URL}/ib/admin/commission-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountTypeId: commissionEditTypeId,
+          levels: commissionLevelsDraft
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Commission configuration saved (applies to new trades only)')
+        fetchCommissionConfig()
+      } else {
+        toast.error(data.message || 'Save failed')
+      }
+    } catch (e) {
+      toast.error('Failed to save commission config')
+    }
+    setSavingCommission(false)
+  }
+
+  const addCommissionLevelRow = () => {
+    const next =
+      commissionLevelsDraft.length > 0
+        ? Math.max(...commissionLevelsDraft.map((l) => l.level)) + 1
+        : 1
+    setCommissionLevelsDraft([
+      ...commissionLevelsDraft,
+      { level: next, commissionPercent: 1, isActive: true }
+    ])
+  }
+
+  const updateCommissionLevel = (idx, field, value) => {
+    setCommissionLevelsDraft((prev) => {
+      const copy = [...prev]
+      copy[idx] = { ...copy[idx], [field]: value }
+      return copy
+    })
+  }
+
+  const removeCommissionLevel = (idx) => {
+    setCommissionLevelsDraft((prev) => prev.filter((_, i) => i !== idx))
   }
 
   const fetchPlans = async () => {
@@ -479,6 +602,7 @@ const AdminIBManagement = () => {
         {[
           { id: 'ibs', label: 'Active IBs', count: dashboard?.ibs?.active },
           { id: 'applications', label: 'Applications', count: applications.length },
+          { id: 'commission', label: 'Commission %' },
           { id: 'levels', label: 'IB Levels', count: ibLevels.length, icon: Award },
           { id: 'transfer', label: 'Referral Transfer', icon: ArrowRightLeft },
           { id: 'settings', label: 'Settings' }
@@ -632,6 +756,17 @@ const AdminIBManagement = () => {
                       <p className="text-white font-medium">{app.firstName} {app.lastName}</p>
                       <p className="text-gray-500 text-sm">{app.email}</p>
                       <p className="text-gray-600 text-xs">Applied: {new Date(app.createdAt).toLocaleDateString()}</p>
+                      {app.referredByIb ? (
+                        <p className="text-gray-500 text-xs mt-1">
+                          Referred by:{' '}
+                          <span className="text-blue-400">
+                            {app.referredByIb.referralCode || app.referredByIb.email}{' '}
+                            ({app.referredByIb.firstName || 'IB'})
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-gray-600 text-xs mt-1">Referred by: (Organic)</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -654,14 +789,14 @@ const AdminIBManagement = () => {
                           toast.error('Please select a plan first')
                           return
                         }
-                        handleApprove(app._id, planId)
+                        handleApprove(app.userId, planId)
                       }}
                       className="flex items-center gap-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm"
                     >
                       <Check size={16} /> Approve
                     </button>
                     <button
-                      onClick={() => handleReject(app._id)}
+                      onClick={() => handleReject(app.userId)}
                       className="flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:bg-red-600 text-sm"
                     >
                       <X size={16} /> Reject
@@ -671,6 +806,99 @@ const AdminIBManagement = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Multi-level commission % by account type (trader-relative upline) */}
+      {activeTab === 'commission' && (
+        <div className="bg-dark-800 rounded-xl border border-gray-800 overflow-hidden p-4 sm:p-6 space-y-6">
+          <div>
+            <h2 className="text-white font-semibold text-lg">IB commission by account type</h2>
+            <p className="text-gray-500 text-sm mt-1">
+              Level 1 = direct referrer; each level is a % of gross trade commission. Total must be under 100%; each level ≤ the previous. Changes apply to new trades only.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3 items-center">
+            <label className="text-gray-400 text-sm">Account type</label>
+            <select
+              className="bg-dark-700 border border-gray-700 rounded-lg px-3 py-2 text-white"
+              value={commissionEditTypeId || ''}
+              onChange={(e) => selectCommissionAccountType(e.target.value)}
+            >
+              {commissionAccountTypes.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={addCommissionLevelRow}
+              className="px-3 py-2 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-600"
+            >
+              + Add level
+            </button>
+            <button
+              type="button"
+              onClick={saveCommissionConfig}
+              disabled={savingCommission || !commissionEditTypeId}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50"
+            >
+              {savingCommission ? 'Saving…' : 'Save configuration'}
+            </button>
+          </div>
+          <div className="space-y-3">
+            {[...commissionLevelsDraft]
+              .map((row, i) => ({ row, i }))
+              .sort((a, b) => a.row.level - b.row.level)
+              .map(({ row, i }) => (
+                <div key={`${row.level}-${i}`} className="flex flex-wrap items-center gap-3">
+                  <span className="text-gray-500 w-28 text-sm">Level {row.level}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.1}
+                    className="w-24 bg-dark-700 border border-gray-700 rounded-lg px-2 py-1.5 text-white"
+                    value={row.commissionPercent}
+                    onChange={(e) =>
+                      updateCommissionLevel(i, 'commissionPercent', parseFloat(e.target.value) || 0)
+                    }
+                  />
+                  <span className="text-gray-500 text-sm">%</span>
+                  <label className="flex items-center gap-2 text-gray-400 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={row.isActive !== false}
+                      onChange={(e) => updateCommissionLevel(i, 'isActive', e.target.checked)}
+                    />
+                    Active
+                  </label>
+                  <button
+                    type="button"
+                    className="text-red-400 text-sm hover:underline"
+                    onClick={() => removeCommissionLevel(i)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+          </div>
+          <div className="border-t border-gray-700 pt-4 text-sm">
+            <p className="text-gray-400">
+              Active total:{' '}
+              <span className="text-white font-medium">
+                {commissionLevelsDraft
+                  .filter((l) => l.isActive !== false)
+                  .reduce((s, l) => s + Number(l.commissionPercent || 0), 0)
+                  .toFixed(2)}
+                %
+              </span>
+              <span className="text-gray-500 ml-2">
+                — Platform keeps the remainder (for new trades).
+              </span>
+            </p>
+          </div>
         </div>
       )}
 

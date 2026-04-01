@@ -380,6 +380,8 @@ class TradeEngine {
       trade.adminModifiedAt = new Date()
     }
 
+    trade.closeCommission = closeCommission
+
     await trade.save()
 
     // Update account balance with proper credit handling
@@ -428,23 +430,23 @@ class TradeEngine {
       console.error('Error processing IB commission:', ibError)
     }
 
-    // Close follower trades if this is a master trade
-    this.closeFollowerTradesAsync(trade._id, closePrice)
-
-    return { trade, realizedPnl }
-  }
-
-  // Async close follower trades (non-blocking)
-  async closeFollowerTradesAsync(masterTradeId, closePrice) {
+    // Close mirrored copy trades (must await — otherwise UI/refetch sees followers still OPEN)
     try {
       const copyTradingEngine = (await import('./copyTradingEngine.js')).default
-      const results = await copyTradingEngine.closeFollowerTrades(masterTradeId, closePrice)
-      if (results.length > 0) {
-        console.log(`Closed ${results.length} follower trades for master trade ${masterTradeId}`)
+      const followerResults = await copyTradingEngine.closeFollowerTrades(
+        trade._id,
+        currentBid,
+        currentAsk
+      )
+      if (followerResults.length > 0) {
+        const ok = followerResults.filter((r) => r.status === 'SUCCESS').length
+        console.log(`[CopyTrade] Master ${trade._id}: closed ${ok}/${followerResults.length} follower copies`)
       }
     } catch (error) {
       console.error('Error closing follower trades:', error)
     }
+
+    return { trade, realizedPnl }
   }
 
   // Validate SL/TP values based on trade side and open price

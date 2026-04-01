@@ -13,6 +13,7 @@ import toast from 'react-hot-toast'
 import LanguageDropdown from '../components/LanguageDropdown'
 import UserHeader from '../components/UserHeader'
 import { useLockDocumentScroll } from '../hooks/useLockDocumentScroll'
+import priceStreamService from '../services/priceStream'
 
 const CopyTradePage = () => {
   useLockDocumentScroll()
@@ -87,6 +88,24 @@ const CopyTradePage = () => {
     fetchAccounts()
     fetchMyMasterProfile()
   }, [])
+
+  useEffect(() => {
+    if (activeTab !== 'trades') return
+    let debounceTimer
+    const debouncedRefetch = () => {
+      clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => fetchMyCopyTrades(), 350)
+    }
+    fetchMyCopyTrades()
+    const interval = setInterval(() => fetchMyCopyTrades(), 8000)
+    priceStreamService.connect()
+    const unsub = priceStreamService.subscribe('copyTradePageTrades', debouncedRefetch)
+    return () => {
+      clearInterval(interval)
+      clearTimeout(debounceTimer)
+      unsub()
+    }
+  }, [activeTab])
 
   // Fetch my followers when master profile is loaded
   useEffect(() => {
@@ -801,8 +820,25 @@ const CopyTradePage = () => {
                           <td className="px-4 py-3 text-white text-sm">{trade.followerLotSize}</td>
                           <td className="px-4 py-3 text-white text-sm">{trade.followerOpenPrice?.toFixed(5)}</td>
                           <td className="px-4 py-3 text-white text-sm">{trade.followerClosePrice?.toFixed(5) || '-'}</td>
-                          <td className={`px-4 py-3 text-sm font-medium ${trade.followerPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            ${trade.followerPnl?.toFixed(2) || '0.00'}
+                          <td className={`px-4 py-3 text-sm font-medium ${
+                            (trade.displayPnl != null ? trade.displayPnl : trade.followerPnl || 0) >= 0
+                              ? 'text-green-500'
+                              : 'text-red-500'
+                          }`}>
+                            {trade.status === 'OPEN' && trade.displayPnl != null ? (
+                              <span title="Unrealized P/L (updates with price)">
+                                {(trade.displayPnl >= 0 ? '+' : '')}${trade.displayPnl.toFixed(2)}
+                                <span className="text-gray-500 text-xs ml-1">live</span>
+                              </span>
+                            ) : trade.status === 'OPEN' ? (
+                              <span className="text-gray-500" title="Waiting for price feed">
+                                —
+                              </span>
+                            ) : (
+                              <span>
+                                {(trade.followerPnl >= 0 ? '+' : '')}${(trade.followerPnl ?? 0).toFixed(2)}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded text-xs ${

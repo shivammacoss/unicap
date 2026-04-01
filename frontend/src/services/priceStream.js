@@ -2,7 +2,10 @@
 import { io } from 'socket.io-client'
 import { API_BASE_URL } from '../config/api'
 
-const SOCKET_URL = API_BASE_URL
+// Empty API_BASE_URL in dev = same origin; Vite proxies /socket.io to the backend
+const SOCKET_URL =
+  API_BASE_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000')
 
 class PriceStreamService {
   constructor() {
@@ -17,8 +20,9 @@ class PriceStreamService {
   connect() {
     if (this.socket?.connected) return
 
+    // polling first: Vite's /socket.io WebSocket proxy often hits ECONNRESET with websocket-only
     this.socket = io(SOCKET_URL, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,

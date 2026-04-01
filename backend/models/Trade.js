@@ -97,6 +97,11 @@ const tradeSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  /** Charged on close when commission-on-close is enabled (included in IB gross pool). */
+  closeCommission: {
+    type: Number,
+    default: 0
+  },
   swap: {
     type: Number,
     default: 0
@@ -120,7 +125,7 @@ const tradeSchema = new mongoose.Schema({
   },
   closedBy: {
     type: String,
-    enum: ['USER', 'SL', 'TP', 'STOP_OUT', 'ADMIN', null],
+    enum: ['USER', 'SL', 'TP', 'STOP_OUT', 'ADMIN', 'COPY', null],
     default: null
   },
   openedAt: {

@@ -253,9 +253,10 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
+    const emailNorm = typeof email === 'string' ? email.trim().toLowerCase() : ''
 
     // Find user by email
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email: emailNorm })
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' })
     }

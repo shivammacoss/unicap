@@ -6,6 +6,16 @@ const accountTypeSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  slug: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: ''
+  },
+  spreadMarkup: {
+    type: Number,
+    default: 0
+  },
   description: {
     type: String,
     default: ''

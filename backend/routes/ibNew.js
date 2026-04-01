@@ -5,22 +5,38 @@ import IBCommission from '../models/IBCommissionNew.js'
 import IBWallet from '../models/IBWallet.js'
 import IBLevel from '../models/IBLevel.js'
 import IBSettings from '../models/IBSettings.js'
+import IBApplication from '../models/IBApplication.js'
+import AccountType from '../models/AccountType.js'
 import ibEngine from '../services/ibEngineNew.js'
 import mongoose from 'mongoose'
 
 const router = express.Router()
+
+function userIdFromQuery(req) {
+  const q = req.query.userId
+  if (q === undefined || q === null || q === '' || q === 'undefined' || q === 'null') return null
+  return String(q).trim()
+}
+
+function buildReferralLink(code) {
+  const baseUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')
+  if (process.env.IB_REFERRAL_USE_REF_PATH === 'false') {
+    return `${baseUrl}/signup?ref=${code}`
+  }
+  return `${baseUrl}/ref/${code}`
+}
 
 // ==================== USER ROUTES ====================
 
 // POST /api/ib/apply - Apply to become an IB
 router.post('/apply', async (req, res) => {
   try {
-    const { userId } = req.body
+    const { userId, payoutMethod } = req.body
     if (!userId) {
       return res.status(400).json({ success: false, message: 'User ID is required' })
     }
 
-    const user = await ibEngine.applyForIB(userId)
+    const user = await ibEngine.applyForIB(userId, payoutMethod)
     res.json({
       success: true,
       message: 'IB application submitted successfully',
@@ -56,8 +72,31 @@ router.post('/reapply', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Only rejected applications can re-apply' })
     }
 
-    // Update status to PENDING
+    let referredByIbUserId = null
+    if (user.referredBy) {
+      const ref = await User.findOne({
+        referralCode: user.referredBy,
+        isIB: true,
+        ibStatus: 'ACTIVE'
+      })
+      if (ref) referredByIbUserId = ref._id
+    }
+    if (!referredByIbUserId && user.parentIBId) {
+      const p = await User.findById(user.parentIBId)
+      if (p?.isIB && p.ibStatus === 'ACTIVE') referredByIbUserId = p._id
+    }
+
+    await IBApplication.create({
+      userId,
+      referredByIbUserId,
+      status: 'PENDING',
+      appliedAt: new Date()
+    })
+
     user.ibStatus = 'PENDING'
+    user.isIB = true
+    user.referralCode = null
+    user.ibRejectionReason = null
     await user.save()
 
     res.json({
@@ -95,61 +134,172 @@ router.post('/register-referral', async (req, res) => {
   }
 })
 
-// GET /api/ib/my-profile/:userId - Get IB profile
-router.get('/my-profile/:userId', async (req, res) => {
+// GET /api/ib/status?userId= — spec (query)
+router.get('/status', async (req, res) => {
   try {
-    const { userId } = req.params
-    
-    // Validate userId
-    if (!userId || userId === 'undefined' || userId === 'null') {
-      return res.status(400).json({ success: false, message: 'Invalid user ID' })
+    const userId = userIdFromQuery(req)
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId query parameter is required' })
     }
-    
-    const user = await User.findById(userId).populate('ibPlanId').populate('ibLevelId')
-    
+    const user = await User.findById(userId).select('isIB ibStatus referralCode ibRejectionReason')
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
-
-    if (!user.isIB) {
-      return res.json({ success: true, isIB: false })
-    }
-
-    const wallet = await IBWallet.getOrCreateWallet(userId)
-    const stats = await ibEngine.getIBStats(userId)
-    
-    // Get level progress
-    let levelProgress = null
-    try {
-      levelProgress = await ibEngine.getIBLevelProgress(userId)
-    } catch (e) {
-      console.error('Error getting level progress:', e)
-    }
-
-    // Check for auto-upgrade
-    if (user.autoUpgradeEnabled) {
-      await ibEngine.checkAndUpgradeLevel(userId)
-    }
-
+    const application = await IBApplication.findOne({ userId })
+      .sort({ createdAt: -1 })
+      .populate('referredByIbUserId', 'firstName referralCode email')
     res.json({
       success: true,
-      isIB: true,
-      ibUser: {
-        _id: user._id,
-        firstName: user.firstName,
-        email: user.email,
-        referralCode: user.referralCode,
-        ibStatus: user.ibStatus,
-        ibLevel: user.ibLevel,
-        ibLevelOrder: user.ibLevelOrder,
-        ibLevelId: user.ibLevelId,
-        autoUpgradeEnabled: user.autoUpgradeEnabled,
-        ibPlan: user.ibPlanId
-      },
-      wallet,
-      stats: stats.stats,
-      levelProgress
+      ibStatus: user.ibStatus,
+      isIB: user.isIB,
+      referralCode: user.referralCode,
+      rejectionReason: user.ibRejectionReason,
+      latestApplication: application
     })
+  } catch (error) {
+    console.error('Error fetching IB status:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/status/:userId — application / IB status (spec)
+router.get('/status/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params
+    const user = await User.findById(userId).select('isIB ibStatus referralCode ibRejectionReason')
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+    const application = await IBApplication.findOne({ userId })
+      .sort({ createdAt: -1 })
+      .populate('referredByIbUserId', 'firstName referralCode email')
+    res.json({
+      success: true,
+      ibStatus: user.ibStatus,
+      isIB: user.isIB,
+      referralCode: user.referralCode,
+      rejectionReason: user.ibRejectionReason,
+      latestApplication: application
+    })
+  } catch (error) {
+    console.error('Error fetching IB status:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/referral-link?userId= — spec
+router.get('/referral-link', async (req, res) => {
+  const userId = userIdFromQuery(req)
+  if (!userId) {
+    return res.status(400).json({ success: false, message: 'userId query parameter is required' })
+  }
+  try {
+    const user = await User.findById(userId).select('referralCode ibStatus isIB')
+    if (!user || !user.referralCode || user.ibStatus !== 'ACTIVE') {
+      return res.status(404).json({
+        success: false,
+        message: 'Active IB with referral code not found'
+      })
+    }
+    res.json({
+      success: true,
+      referralCode: user.referralCode,
+      referralLink: buildReferralLink(user.referralCode)
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/referral-link/:userId — public referral URL (active IB only)
+router.get('/referral-link/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params
+    const user = await User.findById(userId).select('referralCode ibStatus isIB')
+    if (!user || !user.referralCode || user.ibStatus !== 'ACTIVE') {
+      return res.status(404).json({
+        success: false,
+        message: 'Active IB with referral code not found'
+      })
+    }
+    res.json({
+      success: true,
+      referralCode: user.referralCode,
+      referralLink: buildReferralLink(user.referralCode)
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+async function sendIbDashboard(req, res, userId) {
+  if (!userId || userId === 'undefined' || userId === 'null') {
+    return res.status(400).json({ success: false, message: 'Invalid user ID' })
+  }
+
+  const user = await User.findById(userId).populate('ibPlanId').populate('ibLevelId')
+
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' })
+  }
+
+  if (!user.isIB) {
+    return res.json({ success: true, isIB: false })
+  }
+
+  const wallet = await IBWallet.getOrCreateWallet(userId)
+  const stats = await ibEngine.getIBStats(userId)
+
+  let levelProgress = null
+  try {
+    levelProgress = await ibEngine.getIBLevelProgress(userId)
+  } catch (e) {
+    console.error('Error getting level progress:', e)
+  }
+
+  if (user.autoUpgradeEnabled) {
+    await ibEngine.checkAndUpgradeLevel(userId)
+  }
+
+  res.json({
+    success: true,
+    isIB: true,
+    ibUser: {
+      _id: user._id,
+      firstName: user.firstName,
+      email: user.email,
+      referralCode: user.referralCode,
+      ibStatus: user.ibStatus,
+      ibLevel: user.ibLevel,
+      ibLevelOrder: user.ibLevelOrder,
+      ibLevelId: user.ibLevelId,
+      autoUpgradeEnabled: user.autoUpgradeEnabled,
+      ibPlan: user.ibPlanId
+    },
+    wallet,
+    stats: stats.stats,
+    levelProgress
+  })
+}
+
+// GET /api/ib/dashboard?userId= — spec alias for my-profile
+router.get('/dashboard', async (req, res) => {
+  try {
+    const userId = userIdFromQuery(req)
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId query parameter is required' })
+    }
+    await sendIbDashboard(req, res, userId)
+  } catch (error) {
+    console.error('Error fetching IB dashboard:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/my-profile/:userId - Get IB profile
+router.get('/my-profile/:userId', async (req, res) => {
+  try {
+    await sendIbDashboard(req, res, req.params.userId)
   } catch (error) {
     console.error('Error fetching IB profile:', error)
     res.status(500).json({ success: false, message: error.message })
@@ -205,6 +355,64 @@ router.get('/my-downline/:userId', async (req, res) => {
       parseInt(maxDepth)
     )
 
+    res.json({ success: true, tree })
+  } catch (error) {
+    console.error('Error fetching downline:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/referrals?userId= — spec
+router.get('/referrals', async (req, res) => {
+  try {
+    const userId = userIdFromQuery(req)
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId query parameter is required' })
+    }
+    const referrals = await User.find({ parentIBId: userId })
+      .select('firstName email createdAt isIB ibStatus')
+      .sort({ createdAt: -1 })
+    res.json({ success: true, referrals })
+  } catch (error) {
+    console.error('Error fetching referrals:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/commissions?userId= — spec
+router.get('/commissions', async (req, res) => {
+  try {
+    const userId = userIdFromQuery(req)
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId query parameter is required' })
+    }
+    const { limit = 50, offset = 0 } = req.query
+    const commissions = await IBCommission.find({ ibUserId: userId })
+      .populate('traderUserId', 'firstName email')
+      .populate('tradeId', 'tradeId symbol side')
+      .sort({ createdAt: -1 })
+      .skip(parseInt(offset, 10))
+      .limit(parseInt(limit, 10))
+    const total = await IBCommission.countDocuments({ ibUserId: userId })
+    res.json({ success: true, commissions, total })
+  } catch (error) {
+    console.error('Error fetching commissions:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/downline?userId= — spec
+router.get('/downline', async (req, res) => {
+  try {
+    const userId = userIdFromQuery(req)
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId query parameter is required' })
+    }
+    const { maxDepth = 5 } = req.query
+    const tree = await ibEngine.getIBTree(
+      new mongoose.Types.ObjectId(userId),
+      parseInt(maxDepth, 10)
+    )
     res.json({ success: true, tree })
   } catch (error) {
     console.error('Error fetching downline:', error)
@@ -272,12 +480,31 @@ router.get('/admin/all', async (req, res) => {
 router.get('/admin/pending', async (req, res) => {
   try {
     const pending = await User.find({ isIB: true, ibStatus: 'PENDING' })
-      .select('firstName lastName email referralCode ibLevel createdAt')
+      .select('firstName lastName email referralCode ibLevel createdAt parentIBId')
       .sort({ createdAt: -1 })
 
-    res.json({ success: true, pending })
+    const apps = await IBApplication.find({ status: 'PENDING' })
+      .populate('userId', 'firstName lastName email createdAt')
+      .populate('referredByIbUserId', 'firstName referralCode email')
+      .sort({ appliedAt: -1 })
+
+    res.json({ success: true, pending, applications: apps })
   } catch (error) {
     console.error('Error fetching pending IBs:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/admin/requests — spec alias (?status=PENDING)
+router.get('/admin/requests', async (req, res) => {
+  try {
+    const { status = 'PENDING' } = req.query
+    const apps = await IBApplication.find({ status })
+      .populate('userId', 'firstName lastName email createdAt')
+      .populate('referredByIbUserId', 'firstName referralCode email')
+      .sort({ appliedAt: -1 })
+    res.json({ success: true, requests: apps })
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
 })
@@ -286,9 +513,9 @@ router.get('/admin/pending', async (req, res) => {
 router.put('/admin/approve/:userId', async (req, res) => {
   try {
     const { userId } = req.params
-    const { planId } = req.body
+    const { planId, adminId } = req.body
 
-    const user = await ibEngine.approveIB(userId, planId)
+    const user = await ibEngine.approveIB(userId, planId, adminId || null)
     res.json({
       success: true,
       message: 'IB approved successfully',
@@ -309,14 +536,9 @@ router.put('/admin/approve/:userId', async (req, res) => {
 router.put('/admin/reject/:userId', async (req, res) => {
   try {
     const { userId } = req.params
-    const { reason } = req.body
+    const { reason, adminId } = req.body
 
-    const user = await User.findById(userId)
-    if (!user) throw new Error('User not found')
-
-    user.ibStatus = 'REJECTED'
-    user.ibRejectionReason = reason
-    await user.save()
+    const user = await ibEngine.rejectIBApplication(userId, reason, adminId || null)
 
     res.json({
       success: true,
@@ -769,6 +991,140 @@ router.get('/admin/dashboard', async (req, res) => {
     })
   } catch (error) {
     console.error('Error fetching dashboard:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/admin/directory — root IBs + downline trees (spec)
+router.get('/admin/directory', async (req, res) => {
+  try {
+    const { maxDepth = 6 } = req.query
+    const roots = await User.find({
+      isIB: true,
+      ibStatus: 'ACTIVE',
+      $or: [{ parentIBId: null }, { parentIBId: { $exists: false } }]
+    })
+      .select('firstName email referralCode ibLevel createdAt')
+      .sort({ createdAt: -1 })
+
+    const trees = await Promise.all(
+      roots.map(async (r) => {
+        const tree = await ibEngine.getIBTree(r._id, parseInt(maxDepth, 10))
+        const wallet = await IBWallet.findOne({ ibUserId: r._id })
+        const direct = await User.countDocuments({ parentIBId: r._id })
+        return {
+          ib: r.toObject(),
+          directReferrals: direct,
+          walletBalance: wallet?.balance || 0,
+          totalEarned: wallet?.totalEarned || 0,
+          tree
+        }
+      })
+    )
+
+    res.json({ success: true, directory: trees })
+  } catch (error) {
+    console.error('Error fetching IB directory:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/admin/directory/:id — single IB detail + tree
+router.get('/admin/directory/:id', async (req, res) => {
+  try {
+    const { maxDepth = 8 } = req.query
+    const ib = await User.findById(req.params.id).select('-password')
+    if (!ib?.isIB) {
+      return res.status(404).json({ success: false, message: 'IB not found' })
+    }
+    const stats = await ibEngine.getIBStats(req.params.id)
+    const tree = await ibEngine.getIBTree(new mongoose.Types.ObjectId(req.params.id), parseInt(maxDepth, 10))
+    res.json({ success: true, ib, stats, tree })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// POST /api/ib/admin/requests/:id/approve — spec (by application id)
+router.post('/admin/requests/:id/approve', async (req, res) => {
+  try {
+    const application = await IBApplication.findById(req.params.id)
+    if (!application || application.status !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'Pending application not found' })
+    }
+    const { planId, adminId } = req.body
+    const user = await ibEngine.approveIB(application.userId.toString(), planId, adminId || null)
+    res.json({
+      success: true,
+      message: 'IB approved',
+      user: { _id: user._id, ibStatus: user.ibStatus, referralCode: user.referralCode }
+    })
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message })
+  }
+})
+
+// POST /api/ib/admin/requests/:id/reject
+router.post('/admin/requests/:id/reject', async (req, res) => {
+  try {
+    const application = await IBApplication.findById(req.params.id)
+    if (!application || application.status !== 'PENDING') {
+      return res.status(400).json({ success: false, message: 'Pending application not found' })
+    }
+    const { reason, adminId } = req.body
+    const user = await ibEngine.rejectIBApplication(application.userId.toString(), reason, adminId || null)
+    res.json({ success: true, message: 'Application rejected', user: { _id: user._id, ibStatus: user.ibStatus } })
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/admin/commission-config — per account type, multi-level %
+router.get('/admin/commission-config', async (req, res) => {
+  try {
+    await ibEngine.ensureDefaultCommissionConfigs()
+    const grouped = await ibEngine.getCommissionConfigsGrouped()
+    const accountTypes = await AccountType.find({}).sort({ name: 1 })
+    res.json({ success: true, configs: grouped, accountTypes })
+  } catch (error) {
+    console.error('Error fetching commission config:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// PUT /api/ib/admin/commission-config — body: { accountTypeId, levels: [{ level, commissionPercent, isActive }] }
+router.put('/admin/commission-config', async (req, res) => {
+  try {
+    const { accountTypeId, levels } = req.body
+    if (!accountTypeId || !Array.isArray(levels)) {
+      return res.status(400).json({ success: false, message: 'accountTypeId and levels[] required' })
+    }
+    const result = await ibEngine.replaceCommissionConfigForAccountType(accountTypeId, levels)
+    res.json({ success: true, message: 'Commission configuration saved', ...result })
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message })
+  }
+})
+
+// GET /api/ib/admin/ledger — full commission ledger (spec alias)
+router.get('/admin/ledger', async (req, res) => {
+  try {
+    const { status, limit = 100, offset = 0 } = req.query
+    let query = {}
+    if (status) query.status = status
+
+    const commissions = await IBCommission.find(query)
+      .populate('ibUserId', 'firstName email referralCode')
+      .populate('traderUserId', 'firstName email')
+      .populate('tradeId', 'tradeId symbol side quantity')
+      .populate('accountTypeId', 'name slug')
+      .sort({ createdAt: -1 })
+      .skip(parseInt(offset, 10))
+      .limit(parseInt(limit, 10))
+
+    const total = await IBCommission.countDocuments(query)
+    res.json({ success: true, ledger: commissions, total })
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
 })

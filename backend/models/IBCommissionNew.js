@@ -42,14 +42,28 @@ const ibCommissionSchema = new mongoose.Schema({
     type: Number,
     default: 100000
   },
+  accountTypeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AccountType',
+    default: null
+  },
+  grossCommission: {
+    type: Number,
+    default: 0
+  },
+  commissionPercent: {
+    type: Number,
+    default: 0
+  },
   commissionType: {
     type: String,
-    enum: ['PER_LOT', 'PERCENT'],
-    required: true
+    enum: ['PER_LOT', 'PERCENT', 'PERCENT_OF_GROSS'],
+    required: true,
+    default: 'PERCENT_OF_GROSS'
   },
   status: {
     type: String,
-    enum: ['CREDITED', 'REVERSED'],
+    enum: ['PENDING', 'CREDITED', 'PAID_OUT', 'REVERSED'],
     default: 'CREDITED'
   },
   reversedAt: {
@@ -69,6 +83,14 @@ const ibCommissionSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+})
+
+/** Trader-relative upline step (same as level); API alias for spec "chain_level". */
+ibCommissionSchema.virtual('chainLevel').get(function () {
+  return this.level
 })
 
 export default mongoose.model('IBCommission', ibCommissionSchema)

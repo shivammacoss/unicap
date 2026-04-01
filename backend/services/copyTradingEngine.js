@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'
 import MasterTrader from '../models/MasterTrader.js'
 import CopyFollower from '../models/CopyFollower.js'
 import CopyTrade from '../models/CopyTrade.js'
@@ -331,9 +332,14 @@ class CopyTradingEngine {
   // Mirror SL/TP modification to all follower trades (PARALLEL for speed)
   async mirrorSlTpModification(masterTradeId, newSl, newTp) {
     console.log(`[CopyTrade] Mirroring SL/TP to followers: masterTradeId=${masterTradeId}, SL=${newSl}, TP=${newTp}`)
-    
+
+    const masterOid =
+      masterTradeId && mongoose.Types.ObjectId.isValid(String(masterTradeId))
+        ? new mongoose.Types.ObjectId(String(masterTradeId))
+        : masterTradeId
+
     const copyTrades = await CopyTrade.find({
-      masterTradeId,
+      masterTradeId: masterOid,
       status: 'OPEN'
     })
 
@@ -363,11 +369,32 @@ class CopyTradingEngine {
   }
 
   // Close all follower trades when master closes (PARALLEL for speed)
-  async closeFollowerTrades(masterTradeId, masterClosePrice) {
-    console.log(`[CopyTrade] closeFollowerTrades called with masterTradeId: ${masterTradeId}, price: ${masterClosePrice}`)
-    
+  // bid/ask: use real quotes when available; legacy callers may pass (masterId, singlePrice) only.
+  async closeFollowerTrades(masterTradeId, bid, ask) {
+    let bidN
+    let askN
+    if (ask === undefined || ask === null) {
+      const p = Number(bid)
+      bidN = p
+      askN = p
+    } else {
+      bidN = Number(bid)
+      askN = Number(ask)
+    }
+    if (!Number.isFinite(bidN) || !Number.isFinite(askN) || bidN <= 0 || askN <= 0) {
+      console.warn(`[CopyTrade] closeFollowerTrades: invalid bid/ask`, { masterTradeId, bid, ask })
+      return []
+    }
+
+    console.log(`[CopyTrade] closeFollowerTrades masterTradeId=${masterTradeId} bid=${bidN} ask=${askN}`)
+
+    const masterOid =
+      masterTradeId && mongoose.Types.ObjectId.isValid(String(masterTradeId))
+        ? new mongoose.Types.ObjectId(String(masterTradeId))
+        : masterTradeId
+
     const copyTrades = await CopyTrade.find({
-      masterTradeId,
+      masterTradeId: masterOid,
       status: 'OPEN'
     })
 
@@ -376,16 +403,26 @@ class CopyTradingEngine {
     // Process ALL in parallel for instant close
     const results = await Promise.all(copyTrades.map(async (copyTrade) => {
       try {
-        // Close the follower trade
+        const followerTradeId = copyTrade.followerTradeId?._id ?? copyTrade.followerTradeId
+        if (!followerTradeId) {
+          console.warn(`[CopyTrade] CopyTrade ${copyTrade._id} has no followerTradeId, skipping`)
+          return {
+            copyTradeId: copyTrade._id,
+            status: 'FAILED',
+            reason: 'No follower trade id'
+          }
+        }
+        // Close the follower trade (COPY = mirrored close; avoids confusion with USER in analytics)
         const result = await tradeEngine.closeTrade(
-          copyTrade.followerTradeId,
-          masterClosePrice,
-          masterClosePrice,
-          'USER'
+          followerTradeId,
+          bidN,
+          askN,
+          'COPY'
         )
 
+        const masterClosePx = result.trade.side === 'BUY' ? bidN : askN
         // Update copy trade record
-        copyTrade.masterClosePrice = masterClosePrice
+        copyTrade.masterClosePrice = masterClosePx
         copyTrade.followerClosePrice = result.trade.closePrice
         copyTrade.followerPnl = result.realizedPnl
         copyTrade.status = 'CLOSED'
@@ -406,7 +443,7 @@ class CopyTradingEngine {
           await follower.save()
         }
 
-        console.log(`[CopyTrade] Closed follower trade ${copyTrade.followerTradeId}, PnL: ${result.realizedPnl}`)
+        console.log(`[CopyTrade] Closed follower trade ${followerTradeId}, PnL: ${result.realizedPnl}`)
         return {
           copyTradeId: copyTrade._id,
           status: 'SUCCESS',
