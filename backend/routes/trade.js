@@ -425,26 +425,31 @@ router.get('/pending/:tradingAccountId', async (req, res) => {
 router.get('/history/:tradingAccountId', async (req, res) => {
   try {
     const tradingAccountId = castTradingAccountId(req.params.tradingAccountId)
-    const { limit = 50, offset = 0 } = req.query
+    const { limit, offset = 0 } = req.query
 
-    const trades = await Trade.find({ 
-      tradingAccountId, 
-      status: 'CLOSED' 
+    const query = Trade.find({
+      tradingAccountId,
+      status: 'CLOSED'
     })
       .sort({ closedAt: -1 })
       .skip(parseInt(offset))
-      .limit(parseInt(limit))
 
-    const total = await Trade.countDocuments({ 
-      tradingAccountId, 
-      status: 'CLOSED' 
+    if (limit !== undefined && limit !== '' && limit !== 'all') {
+      query.limit(parseInt(limit))
+    }
+
+    const trades = await query
+
+    const total = await Trade.countDocuments({
+      tradingAccountId,
+      status: 'CLOSED'
     })
 
     res.json({
       success: true,
       trades,
       total,
-      limit: parseInt(limit),
+      limit: limit !== undefined ? parseInt(limit) : null,
       offset: parseInt(offset)
     })
   } catch (error) {

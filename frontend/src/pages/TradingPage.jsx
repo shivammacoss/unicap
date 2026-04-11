@@ -97,6 +97,8 @@ const TradingPage = () => {
   const [historyFilter, setHistoryFilter] = useState('all') // all, today, week, month, year
   const [historyStartDate, setHistoryStartDate] = useState('')
   const [historyEndDate, setHistoryEndDate] = useState('')
+  const [historyPage, setHistoryPage] = useState(1)
+  const historyPageSize = 20
   
   // Deposit/Withdraw Modal states
   const [showDepositModal, setShowDepositModal] = useState(false)
@@ -775,9 +777,21 @@ const TradingPage = () => {
     })
   }
 
-  // Calculate total P&L for filtered history
+  // Calculate total P&L for filtered history (across ALL pages)
   const getHistoryTotalPnl = () => {
     return getFilteredHistory().reduce((sum, trade) => sum + (trade.realizedPnl || 0), 0)
+  }
+
+  // Paginated slice of the filtered history (20 rows per page)
+  const getPaginatedHistory = () => {
+    const filtered = getFilteredHistory()
+    const start = (historyPage - 1) * historyPageSize
+    return filtered.slice(start, start + historyPageSize)
+  }
+
+  const getHistoryTotalPages = () => {
+    const total = getFilteredHistory().length
+    return Math.max(1, Math.ceil(total / historyPageSize))
   }
 
   // Download trade history as CSV
@@ -1943,7 +1957,7 @@ const TradingPage = () => {
                   ].map(filter => (
                     <button
                       key={filter.key}
-                      onClick={() => { setHistoryFilter(filter.key); setHistoryStartDate(''); setHistoryEndDate('') }}
+                      onClick={() => { setHistoryFilter(filter.key); setHistoryStartDate(''); setHistoryEndDate(''); setHistoryPage(1) }}
                       className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                         historyFilter === filter.key && !historyStartDate
                           ? 'bg-green-500 text-black' 
@@ -1959,21 +1973,21 @@ const TradingPage = () => {
                     <input
                       type="date"
                       value={historyStartDate}
-                      onChange={(e) => setHistoryStartDate(e.target.value)}
+                      onChange={(e) => { setHistoryStartDate(e.target.value); setHistoryPage(1) }}
                       className={`px-2 py-1 rounded text-xs border ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                     />
                     <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>to</span>
                     <input
                       type="date"
                       value={historyEndDate}
-                      onChange={(e) => setHistoryEndDate(e.target.value)}
+                      onChange={(e) => { setHistoryEndDate(e.target.value); setHistoryPage(1) }}
                       className={`px-2 py-1 rounded text-xs border ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                     />
                   </div>
                   
-                  {/* Trade Count & P&L Summary */}
+                  {/* Trade Count & P&L Summary (total is across ALL filtered trades, not just the current page) */}
                   <span className={`ml-auto text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {getFilteredHistory().length} trades | P&L: <span className={getHistoryTotalPnl() >= 0 ? 'text-green-500' : 'text-red-500'}>${getHistoryTotalPnl().toFixed(2)}</span>
+                    {getFilteredHistory().length} trades | Overall P&L: <span className={getHistoryTotalPnl() >= 0 ? 'text-green-500' : 'text-red-500'}>${getHistoryTotalPnl().toFixed(2)}</span>
                   </span>
                   
                   {/* Download CSV Button */}
@@ -2006,7 +2020,7 @@ const TradingPage = () => {
                         <td colSpan="9" className="text-center py-8 text-gray-500">No trade history</td>
                       </tr>
                     ) : (
-                      getFilteredHistory().map(trade => {
+                      getPaginatedHistory().map(trade => {
                         const formatPrice = (price) => {
                           if (!price) return '-'
                           if (trade.symbol.includes('JPY')) return price.toFixed(3)
@@ -2034,6 +2048,34 @@ const TradingPage = () => {
                     )}
                   </tbody>
                 </table>
+
+                {/* History Pagination (20 per page) */}
+                {getFilteredHistory().length > historyPageSize && (
+                  <div className={`flex items-center justify-between px-3 py-2 border-t ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+                    <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Showing {(historyPage - 1) * historyPageSize + 1}-{Math.min(historyPage * historyPageSize, getFilteredHistory().length)} of {getFilteredHistory().length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                        disabled={historyPage === 1}
+                        className={`px-2 py-1 rounded text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed ${isDarkMode ? 'bg-[#1a1a1a] text-gray-300 hover:bg-[#252525]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                      >
+                        Prev
+                      </button>
+                      <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Page {historyPage} of {getHistoryTotalPages()}
+                      </span>
+                      <button
+                        onClick={() => setHistoryPage(p => Math.min(getHistoryTotalPages(), p + 1))}
+                        disabled={historyPage >= getHistoryTotalPages()}
+                        className={`px-2 py-1 rounded text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed ${isDarkMode ? 'bg-[#1a1a1a] text-gray-300 hover:bg-[#252525]' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               )}
 
